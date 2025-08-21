@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* Test CSS to verify file loading */
+body {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+}
+
+/* App-wide tweaks */
+html, body {
+  background-color: rgb(249 250 251);
+  color: rgb(17 24 39);
+}
+
+a {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+input, textarea, select {
+  outline: none;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(59 130 246);
+}
