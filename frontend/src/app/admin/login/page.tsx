@@ -25,7 +25,7 @@ export default function AdminLoginPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await login(email, password);
+      await login(email, password, 'admin');
       // The login function in AuthContext will handle token storage and redirection
     } catch (err: unknown) {
       setError("Invalid credentials. Please try again.");
