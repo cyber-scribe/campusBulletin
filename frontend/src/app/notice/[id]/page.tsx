@@ -84,6 +84,14 @@ export default function NoticeDetail() {
     return status?.charAt(0).toUpperCase() + status?.slice(1).replace('_', ' ');
   };
 
+  // Utility function to get user name from a string or object
+  const getUserName = (user: string | { name?: string; email?: string }): string => {
+    if (typeof user === 'object' && user !== null) {
+      return user.name || user.email || 'N/A';
+    }
+    return user || 'N/A';
+  };
+
   return (
     <div>
       <Navbar />
@@ -111,11 +119,11 @@ export default function NoticeDetail() {
               <h3 className="text-lg font-medium mb-2">Notice Information</h3>
               <div className="space-y-2 text-sm">
                 {notice.createdBy && (
-                  <p><span className="font-medium">Created by:</span> {notice.createdBy.name || notice.createdBy.email}</p>
+                  <p><span className="font-medium">Created by:</span> {getUserName(notice.createdBy)}</p>
                 )}
                 {notice.status === NOTICE_STATUS.PUBLISHED && notice.approvedBy && (
                   <>
-                    <p><span className="font-medium">Approved by:</span> {notice.approvedBy.name || notice.approvedBy.email}</p>
+                    <p><span className="font-medium">Approved by:</span> {getUserName(notice.approvedBy)}</p>
                     {notice.approvedAt && (
                       <p><span className="font-medium">Approved on:</span> {new Date(notice.approvedAt).toLocaleString()}</p>
                     )}
