@@ -25,9 +25,13 @@ export default function StaffEditNoticePage() {
       try {
         const res = await API.get<Notice>(`/notices/${id}`);
         const noticeData = res.data;
-        
-        // Check if user owns this notice
-        if (noticeData.createdBy?._id === user?.id || noticeData.createdBy === user?.id) {
+        // Check if createdBy is an object before accessing properties
+        const createdById = typeof noticeData.createdBy === 'object' && noticeData.createdBy !== null
+          ? noticeData.createdBy.id
+          : noticeData.createdBy;
+
+         // Check if user owns this notice
+        if (createdById === user?.id) {
           setNotice(noticeData);
         } else {
           setError("You can only edit your own notices.");
