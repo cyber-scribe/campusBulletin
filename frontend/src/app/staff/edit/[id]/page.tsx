@@ -7,12 +7,14 @@ import { Notice } from "@/types/notice";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import NoticeForm from "@/components/NoticeForm";
 import { ROLES } from "@/auth/roles";
+import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { ArrowLeft, Edit, AlertCircle } from "lucide-react";
 
-export default function EditNoticePage() {
+export default function StaffEditNoticePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
 
   const [notice, setNotice] = useState<Notice | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,28 +23,32 @@ export default function EditNoticePage() {
   useEffect(() => {
     const fetchNotice = async () => {
       try {
-        const res = await API.get(`/notices/${id}`);
-        console.log("Fetched notice data:", res.data);
-        // Handle the response structure: { success: true, notice: {...} }
-        setNotice(res.data.notice || res.data);
-      } catch (err) {
-        console.error("Error fetching notice:", err);
+        const res = await API.get<Notice>(`/notices/${id}`);
+        const noticeData = res.data;
+        
+        // Check if user owns this notice
+        if (noticeData.createdBy?._id === user?.id || noticeData.createdBy === user?.id) {
+          setNotice(noticeData);
+        } else {
+          setError("You can only edit your own notices.");
+        }
+      } catch {
         setError("Failed to load notice.");
       } finally {
         setLoading(false);
       }
     };
     if (id) fetchNotice();
-  }, [id]);
+  }, [id, user]);
 
   const handleSuccess = () => {
-    router.push("/admin/dashboard");
+    router.push("/staff/dashboard");
     router.refresh();
   };
 
   if (loading) {
     return (
-      <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.STAFF]}>
+      <ProtectedRoute requiredRoles={[ROLES.STAFF]}>
         <div className="min-h-screen flex items-center justify-center" style={{
           background: "linear-gradient(125deg,rgb(28, 28, 31),rgb(71, 65, 140),rgb(26, 26, 67))"
         }}>
@@ -57,7 +63,7 @@ export default function EditNoticePage() {
 
   if (error || !notice) {
     return (
-      <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.STAFF]}>
+      <ProtectedRoute requiredRoles={[ROLES.STAFF]}>
         <div className="min-h-screen" style={{
           background: "linear-gradient(125deg,rgb(28, 28, 31),rgb(71, 65, 140),rgb(26, 26, 67))"
         }}>
@@ -70,7 +76,7 @@ export default function EditNoticePage() {
                   <p className="text-lg font-medium">{error || "Notice not found"}</p>
                 </div>
                 <Link 
-                  href="/admin/dashboard"
+                  href="/staff/dashboard"
                   className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-300"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -85,7 +91,7 @@ export default function EditNoticePage() {
   }
 
   return (
-    <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.STAFF]}>
+    <ProtectedRoute requiredRoles={[ROLES.STAFF]}>
       <div className="min-h-screen" style={{
         background: "linear-gradient(125deg,rgb(28, 28, 31),rgb(71, 65, 140),rgb(26, 26, 67))"
       }}>
@@ -94,7 +100,7 @@ export default function EditNoticePage() {
           <header className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Link 
-                href="/admin/dashboard" 
+                href="/staff/dashboard" 
                 className="p-2 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-300"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -104,7 +110,7 @@ export default function EditNoticePage() {
                   <Edit className="h-6 w-6" />
                   Edit Notice
                 </h1>
-                <p className="text-white/70 text-sm mt-1">Modify notice details and content</p>
+                <p className="text-white/70 text-sm mt-1">Modify your draft notice details</p>
               </div>
             </div>
           </header>

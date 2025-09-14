@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const connectDB = require('./config/database');
 
 // Load environment variables
@@ -18,15 +19,23 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/admin', require('./routes/auth'));
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/notices', require('./routes/notices'));
 
+// Serve frontend static files
+app.use(express.static(path.join(__dirname, '../frontend/out')));
+
+// SPA fallback: serve index.html for any frontend route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/out', 'index.html'));
+});
+
 // Health check route
-app.get('/', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ message: 'Digital Notice Board API is running!' });
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});

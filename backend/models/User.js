@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const { ROLES } = require('../auth/roles');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -17,6 +18,36 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     minlength: 6
+  },
+  avatarUrl: {
+    type: String,
+    default: null
+  },
+  avatarPublicId: {
+    type: String,
+    default: null
+  },
+  studentId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
+  department: {
+    type: String,
+    default: null
+  },
+  branch: {
+    type: String,
+    default: null
+  },
+  year: {
+    type: String,
+    default: null
+  },
+  roles: {
+    type: [String],
+    enum: Object.values(ROLES),
+    default: [ROLES.STUDENT]
   }
 }, {
   timestamps: true

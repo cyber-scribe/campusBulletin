@@ -1,4 +1,5 @@
 import "./globals.css"
+import { AuthProvider } from "../contexts/AuthContext"
 
 export const metadata = {
   title: 'Campus Bulletin Board',
@@ -17,7 +18,9 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className="bg-gray-50 text-gray-900">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

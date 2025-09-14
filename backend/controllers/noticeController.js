@@ -1,23 +1,64 @@
 const Notice = require('../models/Notice');
 const cloudinary = require('../config/cloudinary');
 const fs = require('fs').promises;
+const { NOTICE_STATUS, ROLES } = require('../auth/roles');
 
 
 const getNotices = async (req, res) => {
   try {
-    const { category, search, page = 1, limit = 10 } = req.query;
+    const { category, search, page = 1, limit = 10, status } = req.query;
     
     let query = { isActive: true };
     
+    // Filter by category if provided
     if (category) {
       query.category = category;
     }
     
+    // Text search if provided
     if (search) {
       query.$text = { $search: search };
     }
 
+    // Handle status filtering based on user role
+    if (req.user) {
+      // Admin can see all notices or filter by status
+      if (req.user.roles.includes(ROLES.ADMIN)) {
+        if (status) {
+          query.status = status;
+        }
+      } 
+      // Staff can see published notices and their own notices
+      else if (req.user.roles.includes(ROLES.STAFF)) {
+        if (status) {
+          // Staff can filter their own notices by status
+          query.$and = [
+            { $or: [
+              { status: NOTICE_STATUS.PUBLISHED },
+              { createdBy: req.user._id }
+            ]},
+            { status: status }
+          ];
+        } else {
+          // Default: show published notices and their own notices
+          query.$or = [
+            { status: NOTICE_STATUS.PUBLISHED },
+            { createdBy: req.user._id }
+          ];
+        }
+      }
+      // Students can only see published notices
+      else {
+        query.status = NOTICE_STATUS.PUBLISHED;
+      }
+    } else {
+      // Public users (not logged in) can only see published notices
+      query.status = NOTICE_STATUS.PUBLISHED;
+    }
+
     const notices = await Notice.find(query)
+      .populate('createdBy', 'name email')
+      .populate('approvedBy', 'name email')
       .sort({ datePosted: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -55,66 +96,138 @@ const getNotice = async (req, res) => {
 
 const createNotice = async (req, res) => {
   try {
-    const { title, description, category } = req.body;
-    
+    const { title, category, status } = req.body;
+
     let fileUrl = null;
     let filePublicId = null;
 
     if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'notice-board',
-        resource_type: 'auto'
-      });
+      console.log("📁 Uploading file:", req.file.originalname);
+      console.log("📄 File type:", req.file.mimetype);
+      console.log("📊 File size:", req.file.size, "bytes");
+
+      try {
+        // Cloudinary upload
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          folder: "notice-board",
+          resource_type: req.file.mimetype === "application/pdf" ? "raw" : "auto", 
+          access_mode: "public",
+          use_filename: true,
+          unique_filename: true,
+        });
+
+        fileUrl = uploadResult.secure_url;
+        filePublicId = uploadResult.public_id;
+
+        console.log("✅ File uploaded successfully");
+        console.log("🔗 File URL:", fileUrl);
+        console.log("🆔 Public ID:", filePublicId);
+      } catch (uploadError) {
+        console.error("❌ Cloudinary upload error:", uploadError);
+
+        // Clean up local file
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.warn('Warning: Could not delete temporary file:', unlinkError.message);
+        }
+
+        return res.status(500).json({
+          message: "File upload failed",
+          error: uploadError.message,
+        });
+      }
+
+      // Always clean up local tmp file
+      try {
+        await fs.unlink(req.file.path);
+      } catch (unlinkError) {
+        console.warn('Warning: Could not delete temporary file:', unlinkError.message);
+      }
+    }
+
+    // Determine the initial status based on user role and request
+    let initialStatus;
+    let approvedBy = null;
+    let approvedAt = null;
+    
+    if (req.user.roles.includes(ROLES.ADMIN)) {
+      // Admins can create notices with any status
+      initialStatus = status || NOTICE_STATUS.DRAFT;
       
-      fileUrl = result.secure_url;
-      filePublicId = result.public_id;
-      
-      await fs.unlink(req.file.path);
+      // If admin is directly publishing, set approvedBy and approvedAt
+      if (initialStatus === NOTICE_STATUS.PUBLISHED) {
+        approvedBy = req.user._id;
+        approvedAt = new Date();
+      }
+    } else {
+      // Staff can only create drafts or submit for approval
+      initialStatus = status === NOTICE_STATUS.PENDING_APPROVAL ? 
+        NOTICE_STATUS.PENDING_APPROVAL : NOTICE_STATUS.DRAFT;
     }
 
     const notice = await Notice.create({
       title,
-      description,
       category,
       fileUrl,
-      filePublicId
+      filePublicId,
+      status: initialStatus,
+      createdBy: req.user._id,
+      approvedBy: initialStatus === NOTICE_STATUS.PUBLISHED ? req.user._id : null,
+      approvedAt: initialStatus === NOTICE_STATUS.PUBLISHED ? new Date() : null
     });
 
     res.status(201).json({ success: true, notice });
   } catch (error) {
-    console.error('Create notice error:', error);
-    
+    console.error("Create notice error:", error);
+
+    // Clean up tmp file if error
     if (req.file) {
       try {
         await fs.unlink(req.file.path);
       } catch (unlinkError) {
-        console.error('Error deleting file:', unlinkError);
+        console.warn("Warning: Could not delete temporary file:", unlinkError.message);
       }
     }
-    
-    res.status(500).json({ message: 'Server error' });
+
+    res.status(500).json({ message: "Server error" });
   }
 };
 
+
 const updateNotice = async (req, res) => {
   try {
-    const { title, description, category } = req.body;
+    console.log('Update notice request received for ID:', req.params.id);
+    console.log('Request body:', req.body);
+    console.log('Request file:', req.file);
+    
+    const { title, category, status } = req.body;
     const notice = await Notice.findById(req.params.id);
     
     if (!notice) {
+      console.log('Notice not found for ID:', req.params.id);
       return res.status(404).json({ message: 'Notice not found' });
+    }
+
+    console.log('Found notice:', notice);
+
+    // Check if user has permission to update this notice
+    if (!req.user.roles.includes(ROLES.ADMIN) && 
+        notice.createdBy.toString() !== req.user._id.toString()) {
+      console.log('Permission denied for user:', req.user._id);
+      return res.status(403).json({ 
+        message: 'Access denied: You can only update your own notices' 
+      });
     }
 
     let fileUrl = notice.fileUrl;
     let filePublicId = notice.filePublicId;
 
-
     if (req.file) {
-      
+      console.log('New file uploaded, replacing existing file');
       if (notice.filePublicId) {
         await cloudinary.uploader.destroy(notice.filePublicId);
       }
-console.log(req.file)
       
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: 'notice-board',
@@ -124,14 +237,63 @@ console.log(req.file)
       fileUrl = result.secure_url;
       filePublicId = result.public_id;
       
-      await fs.unlink(req.file.path);
+      try {
+        await fs.unlink(req.file.path);
+      } catch (unlinkError) {
+        console.warn('Warning: Could not delete temporary file:', unlinkError.message);
+      }
+    } else {
+      console.log('No new file uploaded, keeping existing file');
     }
+
+    // Handle status transitions based on user role
+    let newStatus = notice.status;
+    let approvedBy = notice.approvedBy;
+    let approvedAt = notice.approvedAt;
+    
+    if (status && status !== notice.status) {
+      console.log('Status change requested from', notice.status, 'to', status);
+      if (req.user.roles.includes(ROLES.ADMIN)) {
+        // Admins can change to any status
+        newStatus = status;
+        
+        // If publishing, record who approved and when
+        if (status === NOTICE_STATUS.PUBLISHED) {
+          approvedBy = req.user._id;
+          approvedAt = new Date();
+        }
+      } else if (req.user.roles.includes(ROLES.STAFF)) {
+        // Staff can only submit for approval or save as draft
+        if (status === NOTICE_STATUS.PENDING_APPROVAL || 
+            status === NOTICE_STATUS.DRAFT) {
+          newStatus = status;
+        } else {
+          return res.status(403).json({ 
+            message: 'Access denied: You cannot change to this status' 
+          });
+        }
+      }
+    }
+
+    const updateData = {
+      title,
+      category,
+      fileUrl,
+      filePublicId,
+      status: newStatus,
+      approvedBy,
+      approvedAt
+    };
+
+    console.log('Updating notice with data:', updateData);
 
     const updatedNotice = await Notice.findByIdAndUpdate(
       req.params.id,
-      { title, description, category, fileUrl, filePublicId },
+      updateData,
       { new: true }
     );
+
+    console.log('Notice updated successfully:', updatedNotice);
 
     res.json({ success: true, notice: updatedNotice });
   } catch (error) {
@@ -149,6 +311,23 @@ const deleteNotice = async (req, res) => {
       return res.status(404).json({ message: 'Notice not found' });
     }
 
+    // Check if user has permission to delete this notice
+    // Admin can delete any notice
+    // Staff can only delete their own notices that are in DRAFT or PENDING_APPROVAL status
+    if (!req.user.roles.includes(ROLES.ADMIN)) {
+      if (notice.createdBy.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ 
+          message: 'Access denied: You can only delete your own notices' 
+        });
+      }
+      
+      if (notice.status !== NOTICE_STATUS.DRAFT && notice.status !== NOTICE_STATUS.PENDING_APPROVAL) {
+        return res.status(403).json({ 
+          message: 'Access denied: You can only delete draft or pending approval notices' 
+        });
+      }
+    }
+
     if (notice.filePublicId) {
       await cloudinary.uploader.destroy(notice.filePublicId);
     }
@@ -162,10 +341,129 @@ const deleteNotice = async (req, res) => {
   }
 };
 
+// Approve a notice (Admin only)
+const approveNotice = async (req, res) => {
+  try {
+    const notice = await Notice.findById(req.params.id);
+    
+    if (!notice) {
+      return res.status(404).json({ message: 'Notice not found' });
+    }
+
+    // Only pending notices can be approved
+    if (notice.status !== NOTICE_STATUS.PENDING_APPROVAL) {
+      return res.status(400).json({ 
+        message: 'Only notices pending approval can be approved' 
+      });
+    }
+
+    const updatedNotice = await Notice.findByIdAndUpdate(
+      req.params.id,
+      { 
+        status: NOTICE_STATUS.PUBLISHED,
+        approvedBy: req.user._id,
+        approvedAt: new Date()
+      },
+      { new: true }
+    ).populate('createdBy', 'name email');
+
+    res.json({ 
+      success: true, 
+      notice: updatedNotice,
+      message: 'Notice approved and published successfully'
+    });
+  } catch (error) {
+    console.error('Approve notice error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Reject a notice (Admin only)
+const rejectNotice = async (req, res) => {
+  try {
+    const { rejectionReason } = req.body;
+    const notice = await Notice.findById(req.params.id);
+    
+    if (!notice) {
+      return res.status(404).json({ message: 'Notice not found' });
+    }
+
+    // Only pending notices can be rejected
+    if (notice.status !== NOTICE_STATUS.PENDING_APPROVAL) {
+      return res.status(400).json({ 
+        message: 'Only notices pending approval can be rejected' 
+      });
+    }
+
+    const updatedNotice = await Notice.findByIdAndUpdate(
+      req.params.id,
+      { 
+        status: NOTICE_STATUS.REJECTED,
+        rejectionReason: rejectionReason || 'No reason provided',
+        rejectedBy: req.user._id,
+        rejectedAt: new Date()
+      },
+      { new: true }
+    ).populate('createdBy', 'name email');
+
+    res.json({ 
+      success: true, 
+      notice: updatedNotice,
+      message: 'Notice rejected successfully'
+    });
+  } catch (error) {
+    console.error('Reject notice error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Submit a notice for approval (Staff)
+const submitForApproval = async (req, res) => {
+  try {
+    const notice = await Notice.findById(req.params.id);
+    
+    if (!notice) {
+      return res.status(404).json({ message: 'Notice not found' });
+    }
+
+    // Check if user is the creator of this notice
+    if (notice.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        message: 'Access denied: You can only submit your own notices for approval' 
+      });
+    }
+
+    // Only draft notices can be submitted for approval
+    if (notice.status !== NOTICE_STATUS.DRAFT) {
+      return res.status(400).json({ 
+        message: 'Only draft notices can be submitted for approval' 
+      });
+    }
+
+    const updatedNotice = await Notice.findByIdAndUpdate(
+      req.params.id,
+      { status: NOTICE_STATUS.PENDING_APPROVAL },
+      { new: true }
+    );
+
+    res.json({ 
+      success: true, 
+      notice: updatedNotice,
+      message: 'Notice submitted for approval successfully'
+    });
+  } catch (error) {
+    console.error('Submit for approval error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getNotices,
   getNotice,
   createNotice,
   updateNotice,
-  deleteNotice
+  deleteNotice,
+  approveNotice,
+  rejectNotice,
+  submitForApproval
 };

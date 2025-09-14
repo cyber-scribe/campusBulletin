@@ -1,13 +1,38 @@
 const express = require('express');
-const { loginAdmin, createAdmin } = require('../controllers/authController');
+const { 
+  loginAdmin, 
+  createAdmin, 
+  getCurrentUser, 
+  studentRegister, 
+  studentLogin, 
+  staffLogin,
+  createStaff,
+  updateProfile,
+  changePassword,
+  uploadAvatar
+} = require('../controllers/authController');
+const auth = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
-// POST /api/admin/login
-router.post('/login', loginAdmin);
+// Admin routes
+router.post('/admin/login', loginAdmin);
+router.post('/admin/create', createAdmin); // Remove in production
 
-// POST /api/admin/create (remove in production)
-router.post('/create', createAdmin);
+// Staff routes
+router.post('/staff/create', createStaff);
+router.post('/staff/login', staffLogin);
+
+// Student routes
+router.post('/student/login', studentLogin);
+router.post('/student/register', studentRegister);
+
+// Common routes
+router.get('/me', auth, getCurrentUser);
+router.put('/me', auth, updateProfile);
+router.put('/me/password', auth, changePassword);
+router.post('/me/avatar', auth, upload.single('avatar'), uploadAvatar);
 
 module.exports = router;
 
