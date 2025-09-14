@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Notice } from "@/types/notice";
-import { NOTICE_STATUS, NoticeStatus } from "@/auth/roles";
+import { NOTICE_STATUS } from "@/auth/roles";
 import API from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -15,16 +15,6 @@ const StaffDraftQueue = () => {
   const router = useRouter();
   const { user, isStaff } = useAuth();
 
-  useEffect(() => {
-    // Redirect if not staff
-    if (!isStaff) {
-      router.push("/");
-      return;
-    }
-
-    fetchDraftNotices();
-  }, [isStaff, router]);
-
   const fetchDraftNotices = async () => {
     try {
       setLoading(true);
@@ -34,7 +24,7 @@ const StaffDraftQueue = () => {
       
       // Filter notices to only show those created by the current user
       const userNotices = response.data.notices.filter(
-        notice => typeof notice.createdBy === 'object' && notice.createdBy._id === user?._id
+        notice => typeof notice.createdBy === 'object' && (notice.createdBy as any)._id === user?.id
       );
       
       setDraftNotices(userNotices);
@@ -46,6 +36,16 @@ const StaffDraftQueue = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Redirect if not staff
+    if (!isStaff) {
+      router.push("/");
+      return;
+    }
+
+    fetchDraftNotices();
+  }, [isStaff, router]);
 
   const handleDelete = async (noticeId: string) => {
     if (!confirm("Are you sure you want to delete this draft?")) return;

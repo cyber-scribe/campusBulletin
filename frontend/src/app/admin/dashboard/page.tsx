@@ -7,8 +7,8 @@ import { Notice } from "@/types/notice";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { NOTICE_STATUS, NoticeStatus, ROLES } from "@/auth/roles";
-import {LogOut, Plus, CheckCircle, Clock, XCircle, FileText, Users, BarChart3} from "lucide-react";
+import { NOTICE_STATUS, NoticeStatus } from "@/auth/roles";
+import {LogOut, Plus, Clock, FileText, Users, BarChart3} from "lucide-react";
 
 const CATEGORIES = ['Academic',
   'Exam', 
@@ -81,7 +81,7 @@ export default function AdminDashboardPage() {
             <div className="flex items-center gap-4">
               <Link href="/profile" aria-label="Profile">
                 <img
-                  src={(user as any)?.avatarUrl || "https://via.placeholder.com/40"}
+                  src={user?.avatarUrl || "https://via.placeholder.com/40"}
                   alt="profile"
                   className="w-10 h-10 rounded-full border-2 border-white/30 hover:border-purple-400/50 transition-all duration-300"
                 />
@@ -275,7 +275,7 @@ export default function AdminDashboardPage() {
                             
                             {/* Staff can only edit their own draft notices or view others */}
                             {(isAdmin ||
-                              (isStaff && n.status === NOTICE_STATUS.DRAFT && ((typeof n.createdBy === 'string' ? n.createdBy : ((n.createdBy as any).id ?? (n.createdBy as any)._id)) === useAuth().user?.id))) && (
+                              (isStaff && n.status === NOTICE_STATUS.DRAFT && ((typeof n.createdBy === 'string' ? n.createdBy : (n.createdBy as { id?: string; _id?: string }).id ?? (n.createdBy as { id?: string; _id?: string })._id) === user?.id))) && (
                               <Link
                                 href={`/admin/edit/${n._id}`}
                                 className="px-3 py-1 rounded-lg bg-gradient-to-r from-yellow-500/30 to-orange-500/30 text-white hover:from-yellow-500/40 hover:to-orange-500/40 transition-all duration-300 text-sm font-medium border border-yellow-400/30"
@@ -286,13 +286,13 @@ export default function AdminDashboardPage() {
                             
                             {/* Staff can submit draft notices for approval */}
                             {isStaff && !isAdmin && n.status === NOTICE_STATUS.DRAFT && 
-                             ((typeof n.createdBy === 'string' ? n.createdBy : ((n.createdBy as any).id ?? (n.createdBy as any)._id)) === (useAuth().user?.id)) && (
+                             ((typeof n.createdBy === 'string' ? n.createdBy : (n.createdBy as { id?: string; _id?: string }).id ?? (n.createdBy as { id?: string; _id?: string })._id) === user?.id) && (
                               <button
                                 onClick={async () => {
                                   try {
                                     await API.patch(`/notices/${n._id}/submit`);
                                     await load(); // Reload notices after submission
-                                  } catch (err) {
+                                  } catch {
                                     alert("Failed to submit notice for approval");
                                   }
                                 }}
@@ -309,7 +309,7 @@ export default function AdminDashboardPage() {
                                   try {
                                     await API.patch(`/notices/${n._id}/approve`);
                                     await load(); // Reload notices after approval
-                                  } catch (err) {
+                                  } catch {
                                     alert("Failed to approve notice");
                                   }
                                 }}
@@ -328,7 +328,8 @@ export default function AdminDashboardPage() {
                                     try {
                                       await API.patch(`/notices/${n._id}/reject`, { reason });
                                       await load(); // Reload notices after rejection
-                                    } catch (err) {
+                                    } catch (error) {
+                                      console.error(error);
                                       alert("Failed to reject notice");
                                     }
                                   }

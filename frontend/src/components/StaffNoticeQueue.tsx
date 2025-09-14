@@ -34,7 +34,7 @@ const StaffNoticeQueue = () => {
       
       // Filter notices to only show those created by the current user
       const userNotices = response.data.notices.filter(
-        notice => typeof notice.createdBy === 'object' && notice.createdBy._id === user?._id
+        notice => typeof notice.createdBy === 'object' && (notice.createdBy as any)._id === user?.id
       );
       
       setPendingNotices(userNotices);
