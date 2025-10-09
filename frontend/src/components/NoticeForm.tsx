@@ -6,6 +6,7 @@ import API from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { NOTICE_STATUS, NoticeStatus } from "@/auth/roles";
 import { Notice } from "@/types/notice";
+import { FileText, Upload, Save, Send, AlertCircle } from "lucide-react";
 
 const CATEGORIES = ['Academic',
   'Exam', 
@@ -97,7 +98,22 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
       if (onSuccess) {
         onSuccess();
       } else {
-        router.push("/admin/dashboard");
+        // Refresh staff dashboard components if they exist
+        if (typeof window !== 'undefined') {
+          if ((window as any).refreshStaffDrafts) {
+            (window as any).refreshStaffDrafts();
+          }
+          if ((window as any).refreshStaffPending) {
+            (window as any).refreshStaffPending();
+          }
+        }
+        
+        // Navigate based on user role
+        if (isStaff && !isAdmin) {
+          router.push("/staff/dashboard");
+        } else {
+          router.push("/admin/dashboard");
+        }
         router.refresh();
       }
     } catch (err: any) {
@@ -141,184 +157,226 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
   };
 
   return (
-    <form id="noticeForm" onSubmit={handleSubmit} className="bg-white p-6 rounded border space-y-4">
-      <div>
-        <label htmlFor="title" className="block text-sm font-medium">
-          Title
-        </label>
-        <input
-          id="title"
-          required
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="mt-1 w-full border rounded p-2"
-          placeholder="Mid-Sem Exam Schedule"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="category" className="block text-sm font-medium">
-          Category
-        </label>
-        <select
-          id="category"
-          aria-label="Select category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="mt-1 w-full border rounded p-2"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </div>
-
-
-
-      {notice && existingFileUrl && (
+    <div className="space-y-6">
+      {/* Form Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500/30 to-pink-500/30">
+          <FileText className="h-6 w-6 text-white" />
+        </div>
         <div>
-          <label className="block text-sm font-medium">Current Attachment</label>
-          <a
-            className="text-blue-600 hover:underline"
-            href={existingFileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            View current file
-          </a>
+          <h3 className="text-lg font-bold text-white tracking-tight">
+            {notice?._id ? 'Edit Notice Details' : 'Create New Notice'}
+          </h3>
+          <p className="text-white/70 text-sm">
+            {notice?._id ? 'Update your notice information below' : 'Fill in the details for your new notice'}
+          </p>
         </div>
-      )}
-
-      <div>
-        <label htmlFor="file" className="block text-sm font-medium">
-          {notice ? "Replace Attachment (optional)" : "Attachment (Image/PDF)"}
-        </label>
-        <input
-          id="file"
-          type="file"
-          accept=".png,.jpg,.jpeg,.pdf"
-          onChange={handleFileChange}
-          className="mt-1 w-full"
-        />
       </div>
 
-      {/* Status selection for new notices (not for editing) */}
-      {!notice?._id && isStaff && (
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">
-            Submission Type
+      <form id="noticeForm" onSubmit={handleSubmit} className="space-y-6">
+        {/* Title Field */}
+        <div className="space-y-2">
+          <label htmlFor="title" className="block text-sm font-medium text-white/80">
+            Notice Title *
           </label>
-          <div className="flex space-x-4">
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                className="form-radio"
-                name="status"
-                value={NOTICE_STATUS.DRAFT}
-                checked={status === NOTICE_STATUS.DRAFT}
-                onChange={() => setStatus(NOTICE_STATUS.DRAFT)}
-              />
-              <span className="ml-2">Save as Draft</span>
-            </label>
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                className="form-radio"
-                name="status"
-                value={NOTICE_STATUS.PENDING_APPROVAL}
-                checked={status === NOTICE_STATUS.PENDING_APPROVAL}
-                onChange={() => setStatus(NOTICE_STATUS.PENDING_APPROVAL)}
-              />
-              <span className="ml-2">Submit for Approval</span>
-            </label>
-          </div>
+          <input
+            id="title"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full border border-white/20 rounded-xl p-3 bg-white/5 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-300"
+            placeholder="e.g., Mid-Semester Exam Schedule"
+          />
         </div>
-      )}
 
-      {/* Status selection for admins editing notices */}
-      {notice?._id && isAdmin && (
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">
-            Notice Status
+        {/* Category Field */}
+        <div className="space-y-2">
+          <label htmlFor="category" className="block text-sm font-medium text-white/80">
+            Category *
           </label>
-          <div className="flex flex-wrap gap-4">
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                className="form-radio"
-                name="status"
-                value={NOTICE_STATUS.DRAFT}
-                checked={status === NOTICE_STATUS.DRAFT}
-                onChange={() => setStatus(NOTICE_STATUS.DRAFT)}
-              />
-              <span className="ml-2">Draft</span>
-            </label>
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                className="form-radio"
-                name="status"
-                value={NOTICE_STATUS.PENDING_APPROVAL}
-                checked={status === NOTICE_STATUS.PENDING_APPROVAL}
-                onChange={() => setStatus(NOTICE_STATUS.PENDING_APPROVAL)}
-              />
-              <span className="ml-2">Pending Approval</span>
-            </label>
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                className="form-radio"
-                name="status"
-                value={NOTICE_STATUS.PUBLISHED}
-                checked={status === NOTICE_STATUS.PUBLISHED}
-                onChange={() => setStatus(NOTICE_STATUS.PUBLISHED)}
-              />
-              <span className="ml-2">Published</span>
-            </label>
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                className="form-radio"
-                name="status"
-                value={NOTICE_STATUS.REJECTED}
-                checked={status === NOTICE_STATUS.REJECTED}
-                onChange={() => setStatus(NOTICE_STATUS.REJECTED)}
-              />
-              <span className="ml-2">Rejected</span>
-            </label>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <p className="text-red-600 text-sm" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="flex space-x-2">
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded disabled:opacity-50"
-        >
-          {isSubmitting ? "Submitting..." : notice?._id ? "Update Notice" : "Create Notice"}
-        </button>
-        
-        {/* Submit for approval button for staff editing draft notices */}
-        {notice?._id && isStaff && !isAdmin && notice.status === NOTICE_STATUS.DRAFT && (
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={submitForApproval}
-            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded disabled:opacity-50"
+          <select
+          required
+            id="category"
+            aria-label="Select category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full border border-white/20 rounded-xl p-3 bg-white/5 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-300"
           >
-            Submit for Approval
-          </button>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c} className="bg-gray-800 text-white">
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Current Attachment */}
+        {notice && existingFileUrl && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-white/80">Current Attachment</label>
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl blur-xl"></div>
+              <div className="relative p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
+                <a
+                  className="text-blue-300 hover:text-blue-200 transition-colors duration-200 flex items-center gap-2"
+                  href={existingFileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <FileText className="h-4 w-4" />
+                  View current attachment
+                </a>
+              </div>
+            </div>
+          </div>
         )}
-      </div>
-    </form>
+
+        {/* File Upload */}
+        <div className="space-y-2">
+          <label htmlFor="file" className="block text-sm font-medium text-white/80">
+            {notice ? "Replace Attachment (optional) *" : "Attachment (Image/PDF) *"}
+          </label>
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl blur-xl"></div>
+            <div className="relative">
+              <input
+              required
+                id="file"
+                type="file"
+                accept=".png,.jpg,.jpeg,.pdf"
+                onChange={handleFileChange}
+                className="w-full border border-white/20 rounded-xl p-3 bg-white/5 backdrop-blur-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-white/10 file:text-white hover:file:bg-white/20 file:transition-all file:duration-300 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-300"
+              />
+              {file && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-green-300">
+                  <Upload className="h-4 w-4" />
+                  Selected: {file.name}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Status selection for new notices (not for editing) */}
+        {!notice?._id && isStaff && (
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-white/80">
+              Submission Type
+            </label>
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/20 hover:bg-white/10 transition-all duration-300 cursor-pointer">
+                <input
+                  type="radio"
+                  className="w-4 h-4 text-purple-400 bg-white/10 border-white/30 focus:ring-purple-400/50 focus:ring-2"
+                  name="status"
+                  value={NOTICE_STATUS.DRAFT}
+                  checked={status === NOTICE_STATUS.DRAFT}
+                  onChange={() => setStatus(NOTICE_STATUS.DRAFT)}
+                />
+                <div className="flex items-center gap-2">
+                  <Save className="h-4 w-4 text-white/70" />
+                  <span className="text-white font-medium">Save as Draft</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/20 hover:bg-white/10 transition-all duration-300 cursor-pointer">
+                <input
+                  type="radio"
+                  className="w-4 h-4 text-purple-400 bg-white/10 border-white/30 focus:ring-purple-400/50 focus:ring-2"
+                  name="status"
+                  value={NOTICE_STATUS.PENDING_APPROVAL}
+                  checked={status === NOTICE_STATUS.PENDING_APPROVAL}
+                  onChange={() => setStatus(NOTICE_STATUS.PENDING_APPROVAL)}
+                />
+                <div className="flex items-center gap-2">
+                  <Send className="h-4 w-4 text-white/70" />
+                  <span className="text-white font-medium">Submit for Approval</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Status selection for admins editing notices */}
+        {notice?._id && isAdmin && (
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-white/80">
+              Notice Status
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                { value: NOTICE_STATUS.DRAFT, label: 'Draft', icon: Save },
+                { value: NOTICE_STATUS.PENDING_APPROVAL, label: 'Pending Approval', icon: Send },
+                { value: NOTICE_STATUS.PUBLISHED, label: 'Published', icon: FileText },
+                { value: NOTICE_STATUS.REJECTED, label: 'Rejected', icon: AlertCircle }
+              ].map(({ value, label, icon: Icon }) => (
+                <label key={value} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/20 hover:bg-white/10 transition-all duration-300 cursor-pointer">
+                  <input
+                    type="radio"
+                    className="w-4 h-4 text-purple-400 bg-white/10 border-white/30 focus:ring-purple-400/50 focus:ring-2"
+                    name="status"
+                    value={value}
+                    checked={status === value}
+                    onChange={() => setStatus(value)}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-white/70" />
+                    <span className="text-white font-medium">{label}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-xl blur-xl"></div>
+            <div className="relative p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-red-400/30">
+              <div className="flex items-center gap-2 text-red-300">
+                <AlertCircle className="h-4 w-4" />
+                <p className="text-sm font-medium" role="alert">
+                  {error}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-white hover:from-purple-500/40 hover:to-pink-500/40 transition-all duration-300 font-medium border border-purple-400/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                {notice?._id ? "Update Notice" : "Create Notice"}
+              </>
+            )}
+          </button>
+          
+          {/* Submit for approval button for staff editing draft notices */}
+          {notice?._id && isStaff && !isAdmin && notice.status === NOTICE_STATUS.DRAFT && (
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={submitForApproval}
+              className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-white hover:from-green-500/40 hover:to-emerald-500/40 transition-all duration-300 font-medium border border-green-400/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              Submit for Approval
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
   );
 }

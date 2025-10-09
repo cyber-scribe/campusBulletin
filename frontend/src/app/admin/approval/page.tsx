@@ -57,8 +57,7 @@ export default function ApprovalDashboard() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                <Clock className="h-6 w-6" />
-                Notice Approval Queue
+              Notices Awaiting Review
               </h1>
               <p className="text-white/70 text-sm mt-1">Review and approve pending notices from staff members</p>
             </div>
@@ -72,10 +71,7 @@ export default function ApprovalDashboard() {
 
         {/* Queue Container */}
         <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-transparent to-pink-500/10 rounded-2xl blur-xl"></div>
-          <div className="relative rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-white/30 shadow-2xl p-6">
-            <NoticeApprovalQueue />
-          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-transparent to-pink-500/10 rounded-2xl"> <NoticeApprovalQueue /></div>
         </div>
       </main>
     </div>

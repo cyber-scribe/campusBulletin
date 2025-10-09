@@ -13,4 +13,30 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+// Standardize response handling
+API.interceptors.response.use(
+  (response) => {
+    // Log API calls in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`API ${response.config.method?.toUpperCase()} ${response.config.url}:`, response.data);
+    }
+    return response;
+  },
+  (error) => {
+    // Log errors in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`API Error ${error.config?.method?.toUpperCase()} ${error.config?.url}:`, error.response?.data || error.message);
+    }
+    
+    // Handle common error scenarios
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem("token");
+      window.location.href = "/";
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 export default API;

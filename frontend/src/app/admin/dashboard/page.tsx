@@ -201,7 +201,7 @@ export default function AdminDashboardPage() {
                 </option>
               ))}
             </select>
-            <select
+            {/* <select
               aria-label="Filter by status"
               value={status}
               onChange={(e) => setStatus(e.target.value as NoticeStatus | "")}
@@ -213,7 +213,7 @@ export default function AdminDashboardPage() {
                   {s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')}
                 </option>
               ))}
-            </select>
+            </select> */}
           </section>
 
           {/* Table */}

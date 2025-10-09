@@ -7,6 +7,7 @@ import { Notice } from "@/types/notice";
 import { NOTICE_STATUS, NoticeStatus } from "@/auth/roles";
 import API from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { Clock, Eye, Edit, Trash2 } from "lucide-react";
 
 const StaffNoticeQueue = () => {
   const [pendingNotices, setPendingNotices] = useState<Notice[]>([]);
@@ -28,15 +29,37 @@ const StaffNoticeQueue = () => {
   const fetchPendingNotices = async () => {
     try {
       setLoading(true);
-      const response = await API.get<{ notices: Notice[] }>("/notices", {
-        params: { status: NOTICE_STATUS.PENDING_APPROVAL }
+      const response = await API.get("/notices");
+      
+      console.log("Pending API Response:", response.data);
+      console.log("Current user:", user);
+      
+      // Get all notices from response
+      const allNotices = response.data.notices || [];
+      console.log("All notices for pending:", allNotices);
+      
+      // Filter notices to only show pending approval created by the current user
+      const userNotices = allNotices.filter(notice => {
+        console.log("Checking pending notice:", notice);
+        console.log("Notice createdBy:", notice.createdBy);
+        console.log("Notice status:", notice.status);
+        
+        // Check if this notice belongs to current user and is pending approval
+        const isUserNotice = notice.createdBy === user?.id || 
+                            (typeof notice.createdBy === 'object' && notice.createdBy?._id === user?.id) ||
+                            (typeof notice.createdBy === 'object' && notice.createdBy?.id === user?.id);
+        
+        const isPending = notice.status === 'pending_approval' || 
+                         notice.status === 'PENDING_APPROVAL' ||
+                         notice.status === 'pending';
+        
+        console.log("Is user notice:", isUserNotice);
+        console.log("Is pending:", isPending);
+        
+        return isUserNotice && isPending;
       });
       
-      // Filter notices to only show those created by the current user
-      const userNotices = response.data.notices.filter(
-        notice => typeof notice.createdBy === 'object' && (notice.createdBy as any)._id === user?.id
-      );
-      
+      console.log("Filtered pending user notices:", userNotices);
       setPendingNotices(userNotices);
       setError(null);
     } catch (err) {
@@ -66,74 +89,116 @@ const StaffNoticeQueue = () => {
   }
 
   if (error) {
-    return <div className="p-4 text-red-500">{error}</div>;
+    return (
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-2xl blur-xl"></div>
+        <div className="relative p-6 rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-red-400/30 shadow-2xl">
+          <p className="text-red-300 font-medium">{error}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-white shadow rounded-lg p-4">
-      <h2 className="text-xl font-bold mb-4">Your Notices Pending Approval</h2>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="text-left px-4 py-2">Title</th>
-              <th className="text-left px-4 py-2">Category</th>
-              <th className="text-left px-4 py-2">Submitted On</th>
-              <th className="px-4 py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-2xl blur-xl"></div>
+        <div className="relative p-6 rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-white/30 shadow-2xl">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-gradient-to-r from-yellow-500/30 to-orange-500/30">
+              <Clock className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white tracking-tight">Notices Pending Approval</h2>
+              <p className="text-white/70 text-sm mt-1">
+                {pendingNotices.length} {pendingNotices.length === 1 ? 'notice' : 'notices'} awaiting admin review
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 via-transparent to-orange-500/10 rounded-2xl blur-xl"></div>
+        <div className="relative overflow-x-auto rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-white/30 shadow-2xl">
+          <table className="min-w-full">
+            <thead className="bg-white/10 backdrop-blur-sm border-b border-white/20">
               <tr>
-                <td className="px-4 py-6 text-center" colSpan={4}>
-                  Loading pending notices...
-                </td>
+                <th className="text-left px-6 py-4 text-white font-bold">Title</th>
+                <th className="text-left px-6 py-4 text-white font-bold">Category</th>
+                <th className="text-left px-6 py-4 text-white font-bold">Submitted On</th>
+                <th className="px-6 py-4 text-right text-white font-bold">Actions</th>
               </tr>
-            ) : pendingNotices.length === 0 ? (
-              <tr>
-                <td className="px-4 py-6 text-center" colSpan={4}>
-                  You have no notices pending approval.
-                </td>
-              </tr>
-            ) : (
-              pendingNotices.map((notice) => (
-              <tr key={notice._id} className="border-t">
-                <td className="px-4 py-2">{notice.title}</td>
-                <td className="px-4 py-2">
-                  <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
-                    {notice.category}
-                  </span>
-                </td>
-                <td className="px-4 py-2">
-                  {new Date(notice.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-2">
-                  <div className="flex gap-2 justify-end">
-                    <Link
-                      href={`/notice/${notice._id}`}
-                      className="px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 text-xs"
-                    >
-                      View
-                    </Link>
-                    <Link
-                      href={`/staff/edit/${notice._id}`}
-                      className="px-3 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600 text-xs"
-                    >
-                      Edit
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(notice._id)}
-                      className="px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600 text-xs"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            )))
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td className="px-6 py-8" colSpan={4}>
+                    <div className="flex justify-center items-center">
+                      <div className="w-8 h-8 border-4 border-yellow-400/50 border-t-yellow-400 rounded-full animate-spin"></div>
+                      <p className="ml-3 text-white/70 font-medium">Loading pending notices...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : pendingNotices.length === 0 ? (
+                <tr>
+                  <td className="px-6 py-12 text-center" colSpan={4}>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="p-4 rounded-full bg-white/10">
+                        <Clock className="h-8 w-8 text-white/50" />
+                      </div>
+                      <div>
+                        <p className="text-white/70 font-medium">No notices pending approval</p>
+                        <p className="text-white/50 text-sm mt-1">All your submitted notices have been reviewed</p>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                pendingNotices.map((notice) => (
+                  <tr key={notice._id} className="border-t border-white/10 hover:bg-white/5 transition-colors duration-200">
+                    <td className="px-6 py-4 text-white font-medium">{notice.title}</td>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-yellow-500/30 to-orange-500/30 text-yellow-200 border border-yellow-400/30">
+                        {notice.category}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-white/80">
+                      {new Date(notice.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2 justify-end">
+                        <Link
+                          href={`/notice/${notice._id}`}
+                          className="px-3 py-1 rounded-lg bg-gradient-to-r from-blue-500/30 to-indigo-500/30 text-white hover:from-blue-500/40 hover:to-indigo-500/40 transition-all duration-300 text-sm font-medium border border-blue-400/30 flex items-center gap-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          View
+                        </Link>
+                        <Link
+                          href={`/staff/edit/${notice._id}`}
+                          className="px-3 py-1 rounded-lg bg-gradient-to-r from-yellow-500/30 to-orange-500/30 text-white hover:from-yellow-500/40 hover:to-orange-500/40 transition-all duration-300 text-sm font-medium border border-yellow-400/30 flex items-center gap-1"
+                        >
+                          <Edit className="h-3 w-3" />
+                          Edit
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(notice._id)}
+                          className="px-3 py-1 rounded-lg bg-gradient-to-r from-red-500/30 to-red-600/30 text-white hover:from-red-500/40 hover:to-red-600/40 transition-all duration-300 text-sm font-medium border border-red-400/30 flex items-center gap-1"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

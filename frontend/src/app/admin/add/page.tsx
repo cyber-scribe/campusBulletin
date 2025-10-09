@@ -27,7 +27,6 @@ export default function AddNoticePage() {
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <Plus className="h-6 w-6" />
                   Add New Notice
                 </h1>
                 <p className="text-white/70 text-sm mt-1">Create and publish a new campus notice</p>

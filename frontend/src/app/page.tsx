@@ -119,10 +119,13 @@ export default function LoginPage() {
         className="flex w-1/2 justify-center items-center text-white text-5xl font-extrabold tracking-wide shadow-2xl"
         style={{
           background:
-            "linear-gradient(125deg,rgb(28, 28, 31),rgb(71, 65, 140),rgb(26, 26, 67))",
+            "linear-gradient(125deg,rgb(28, 28, 31),rgb(103, 98, 158),rgb(26, 26, 67))",
         }}
       >
-        <span className="drop-shadow-xl shadow-black">CAMPUS BULLETIN</span>
+        <div className="drop-shadow-xl shadow-black flex-col">
+        <div className="text-5xl text-center">CAMPUS BULLETIN</div>
+        <div className="text-lg font-semibold text-center tracking-widest">Your go-to board for everything happening on campus
+        </div></div>
       </div>
 
       {/* Right Panel */}
