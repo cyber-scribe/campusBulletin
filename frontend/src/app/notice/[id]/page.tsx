@@ -6,6 +6,7 @@ import { Notice } from "@/types/notice";
 import Navbar from "@/components/Navbar";
 import { NOTICE_STATUS, NoticeStatus } from "@/auth/roles";
 import { useAuth } from "@/contexts/AuthContext";
+import { User } from "lucide-react";
 
 export default function NoticeDetail() {
   const params = useParams();
@@ -44,7 +45,6 @@ export default function NoticeDetail() {
   if (loading) {
     return (
       <div>
-        <Navbar />
         <main className="max-w-4xl mx-auto p-4">
           <p>Loading...</p>
         </main>
@@ -87,18 +87,19 @@ export default function NoticeDetail() {
   // Utility function to get user name from a string or object
   const getUserName = (user: string | { name?: string; email?: string }): string => {
     if (typeof user === 'object' && user !== null) {
-      return user.name || user.email || 'N/A';
+      return user?.name || user.email || 'N/A';
     }
     return user || 'N/A';
   };
 
   return (
-    <div>
-      <Navbar />
+    <div className="min-h-screen" style={{
+        background: "linear-gradient(315deg,rgba(28, 28, 31, 1),rgba(72, 66, 135, 1),rgba(23, 11, 74, 1))"
+      }}>
       <main className="max-w-4xl mx-auto p-4">
-        <div className="bg-white shadow-sm rounded-lg p-6">
+        <div className="bg-white/15 my-15 border border-gray-400 shadow-sm rounded-lg p-6">
           <div className="flex justify-between items-start mb-4">
-            <h1 className="text-2xl font-bold">{notice.title}</h1>
+            <h1 className="text-2xl text-gray-300 font-bold">{notice.title}</h1>
             {notice.status && (isAdmin || isStaff || notice.status === NOTICE_STATUS.PUBLISHED) && (
               <span className={`px-3 py-1 rounded-full text-sm ${getStatusBadgeColor(notice.status)}`}>
                 {formatStatus(notice.status)}
@@ -106,31 +107,31 @@ export default function NoticeDetail() {
             )}
           </div>
           
-          <div className="flex items-center text-sm text-gray-600 mb-6">
-            <span className="mr-4">{notice.category}</span>
-            <span>Posted on {new Date(notice.createdAt).toLocaleDateString()}</span>
+          <div className="flex items-center text-sm text-gray-300 mb-6">
+            <span className={`px-2 rounded-full text-white border border-white bg-gray-700 `}>{notice.category}</span>
+            <span className="mx-2">Posted on {new Date(notice.createdAt).toLocaleDateString()}</span>
           </div>
           
 
           
           {/* Creator and approval information */}
           {(isAdmin || isStaff) && (
-            <div className="border-t pt-4 mt-6">
-              <h3 className="text-lg font-medium mb-2">Notice Information</h3>
+            <div className="pt-4 mt-6">
+              <h3 className="text-lg text-gray-300 font-medium mb-2">Notice Information</h3>
               <div className="space-y-2 text-sm">
                 {notice.createdBy && (
-                  <p><span className="font-medium">Created by:</span> {getUserName(notice.createdBy)}</p>
+                  <p><span className="font-medium text-gray-200">Created by:</span> {getUserName(notice.createdBy)}</p>
                 )}
                 {notice.status === NOTICE_STATUS.PUBLISHED && notice.approvedBy && (
                   <>
-                    <p><span className="font-medium">Approved by:</span> {getUserName(notice.approvedBy)}</p>
+                    <p><span className="font-medium text-gray-200">Approved by:</span> {getUserName(notice.approvedBy)}</p>
                     {notice.approvedAt && (
-                      <p><span className="font-medium">Approved on:</span> {new Date(notice.approvedAt).toLocaleString()}</p>
+                      <p><span className="font-medium text-gray-200">Approved on:</span> {new Date(notice.approvedAt).toLocaleString()}</p>
                     )}
                   </>
                 )}
                 {notice.status === NOTICE_STATUS.REJECTED && notice.rejectionReason && (
-                  <p><span className="font-medium">Rejection reason:</span> {notice.rejectionReason}</p>
+                  <p><span className="font-medium text-gray-200">Rejection reason:</span> {notice.rejectionReason}</p>
                 )}
               </div>
             </div>
@@ -143,7 +144,7 @@ export default function NoticeDetail() {
                 href={notice.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 inline-flex items-center"
+                className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 inline-flex items-center"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

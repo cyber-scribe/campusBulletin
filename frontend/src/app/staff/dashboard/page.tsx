@@ -60,13 +60,31 @@ export default function StaffDashboardPage() {
       : ((createdBy as any).id ?? (createdBy as any)._id ?? "");
   };
 
-  // Filter notices to show only staff's own notices and published notices
-  const filtered = (Array.isArray(notices) ? notices : []).filter((n) =>
-    n.title?.toLowerCase().includes(q.toLowerCase()) &&
-    (category === "" || n.category === category) &&
-    (status === "" || n.status === status) &&
-    (n.status === NOTICE_STATUS.PUBLISHED || getCreatedById(n.createdBy) === (user?.id))
-  );
+  // First filter by search and category
+const filteredBySearch = (Array.isArray(notices) ? notices : []).filter((n) =>
+  n.title?.toLowerCase().includes(q.toLowerCase()) &&
+  (category === "" || n.category === category) &&
+  (status === "" || n.status === status)
+);
+
+// Then apply tab-based filtering
+const filtered = filteredBySearch.filter((n) => {
+  const isOwner = getCreatedById(n.createdBy) === user?.id;
+  
+  // Show all published notices + user's own notices in "all" tab
+  if (activeTab === "all") {
+    return n.status === NOTICE_STATUS.PUBLISHED || isOwner;
+  }
+  // Show only user's drafts in "drafts" tab
+  if (activeTab === "drafts") {
+    return n.status === NOTICE_STATUS.DRAFT && isOwner;
+  }
+  // Show only user's pending approval notices in "approval" tab
+  if (activeTab === "approval") {
+    return n.status === NOTICE_STATUS.PENDING_APPROVAL && isOwner;
+  }
+  return false;
+});
 
   return (
     <ProtectedRoute>
@@ -155,8 +173,9 @@ export default function StaffDashboardPage() {
           {activeTab === "all" && (
             <>
               {/* Stats Cards */}
-              <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="relative">
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                
+                {/* <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl blur-xl"></div>
                   <div className="relative p-6 rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-white/30 shadow-2xl">
                     <div className="flex items-center justify-between">
@@ -171,7 +190,7 @@ export default function StaffDashboardPage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </div> */}
                 
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-2xl blur-xl"></div>
@@ -230,7 +249,7 @@ export default function StaffDashboardPage() {
                     </option>
                   ))}
                 </select>
-                <select
+                {/* <select
                   aria-label="Filter by status"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as NoticeStatus | "")}
@@ -241,7 +260,7 @@ export default function StaffDashboardPage() {
                   <option value={NOTICE_STATUS.PENDING_APPROVAL} className="bg-gray-800 text-white">Pending Approval</option>
                   <option value={NOTICE_STATUS.PUBLISHED} className="bg-gray-800 text-white">Published</option>
                   <option value={NOTICE_STATUS.REJECTED} className="bg-gray-800 text-white">Rejected</option>
-                </select>
+                </select> */}
               </section>
 
               {/* Table */}

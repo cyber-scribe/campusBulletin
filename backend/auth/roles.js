@@ -1,4 +1,3 @@
-
 // Role constants
 const ROLES = {
   ADMIN: 'admin',

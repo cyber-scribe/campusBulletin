@@ -110,7 +110,7 @@ const createNotice = async (req, res) => {
         // Cloudinary upload
         const uploadResult = await cloudinary.uploader.upload(req.file.path, {
           folder: "notice-board",
-          resource_type: req.file.mimetype === "application/pdf" ? "raw" : "auto", 
+          resource_type: req.file.mimetype.startsWith("image/") ? "image" : "raw",
           access_mode: "public",
           use_filename: true,
           unique_filename: true,

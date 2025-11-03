@@ -59,63 +59,66 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
     }
   }, [notice, isAdmin]);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const persistNotice = async (statusToPersist: NoticeStatus) => {
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("category", category);
+    formData.append("status", statusToPersist);
+
+    if (file) {
+      formData.append("file", file);
+    }
+
+    if (notice?._id) {
+      console.log("Updating notice with ID:", notice._id);
+      const response = await API.put(`/notices/${notice._id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      console.log("Update response:", response.data);
+    } else {
+      console.log("Creating new notice");
+      const response = await API.post("/notices", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      console.log("Create response:", response.data);
+    }
+  };
+
+  const handleSuccessNavigation = () => {
+    if (onSuccess) {
+      onSuccess();
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      if ((window as any).refreshStaffDrafts) {
+        (window as any).refreshStaffDrafts();
+      }
+      if ((window as any).refreshStaffPending) {
+        (window as any).refreshStaffPending();
+      }
+    }
+
+    if (isStaff && !isAdmin) {
+      router.push("/staff/dashboard");
+    } else {
+      router.push("/admin/dashboard");
+    }
+    router.refresh();
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError("");
 
     try {
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("category", category);
-      formData.append("status", status);
-      
-      // Only append file if a new file is selected
-      if (file) {
-        formData.append("file", file);
-      }
-
-      if (notice?._id) {
-        // Update existing notice
-        console.log("Updating notice with ID:", notice._id);
-        const response = await API.put(`/notices/${notice._id}`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
-        console.log("Update response:", response.data);
-      } else {
-        // Create new notice
-        console.log("Creating new notice");
-        const response = await API.post("/notices", formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
-        console.log("Create response:", response.data);
-      }
-
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        // Refresh staff dashboard components if they exist
-        if (typeof window !== 'undefined') {
-          if ((window as any).refreshStaffDrafts) {
-            (window as any).refreshStaffDrafts();
-          }
-          if ((window as any).refreshStaffPending) {
-            (window as any).refreshStaffPending();
-          }
-        }
-        
-        // Navigate based on user role
-        if (isStaff && !isAdmin) {
-          router.push("/staff/dashboard");
-        } else {
-          router.push("/admin/dashboard");
-        }
-        router.refresh();
-      }
+      await persistNotice(status);
+      handleSuccessNavigation();
     } catch (err: any) {
       console.error("Error submitting notice:", err);
       setError(err.response?.data?.message || "Failed to submit notice");
@@ -130,36 +133,36 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
     }
   };
 
-  const submitForApproval = async () => {
+const submitForApproval = async (e?: React.FormEvent) => {
+  if (e) {
+    e.preventDefault();
+  }
+  setError("");
+
+  try {
+    setIsSubmitting(true);
+
     if (notice?._id) {
-      try {
-        setIsSubmitting(true);
-        await API.patch(`/notices/${notice._id}/submit`);
-        if (onSuccess) {
-          onSuccess();
-        } else {
-          router.push("/admin/dashboard");
-          router.refresh();
-        }
-      } catch (err: any) {
-        console.error("Error submitting for approval:", err);
-        setError(err.response?.data?.message || "Failed to submit for approval");
-      } finally {
-        setIsSubmitting(false);
-      }
-    } else {
-      // For new notices, just change the status and submit the form
+      await API.patch(`/notices/${notice._id}/submit`);
       setStatus(NOTICE_STATUS.PENDING_APPROVAL);
-      setTimeout(() => document.getElementById("noticeForm")?.dispatchEvent(
-        new Event("submit", { cancelable: true, bubbles: true })
-      ), 0);
+      handleSuccessNavigation();
+    } else {
+      await persistNotice(NOTICE_STATUS.PENDING_APPROVAL);
+      setStatus(NOTICE_STATUS.PENDING_APPROVAL);
+      handleSuccessNavigation();
     }
-  };
+  } catch (err: any) {
+    console.error("Error submitting for approval:", err);
+    setError(err.response?.data?.message || "Failed to submit for approval");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div className="space-y-6">
       {/* Form Header */}
-      <div className="flex items-center gap-3 mb-6">
+      {/* <div className="flex items-center gap-3 mb-6">
         <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500/30 to-pink-500/30">
           <FileText className="h-6 w-6 text-white" />
         </div>
@@ -171,7 +174,7 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
             {notice?._id ? 'Update your notice information below' : 'Fill in the details for your new notice'}
           </p>
         </div>
-      </div>
+      </div> */}
 
       <form id="noticeForm" onSubmit={handleSubmit} className="space-y-6">
         {/* Title Field */}
@@ -234,13 +237,12 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
         {/* File Upload */}
         <div className="space-y-2">
           <label htmlFor="file" className="block text-sm font-medium text-white/80">
-            {notice ? "Replace Attachment (optional) *" : "Attachment (Image/PDF) *"}
+            {notice ? "Replace Attachment (optional)" : "Attachment (Image/PDF)"}
           </label>
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl blur-xl"></div>
             <div className="relative">
-              <input
-              required
+              <input 
                 id="file"
                 type="file"
                 accept=".png,.jpg,.jpeg,.pdf"

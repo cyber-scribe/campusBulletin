@@ -14,8 +14,8 @@ export interface Notice {
   fileUrl?: string;
   createdAt: string;
   status: NoticeStatus;
-  createdBy: User | string;
-  approvedBy?: User | string | null;
+  createdBy:  User["name"] | string;
+  approvedBy?: User["name"] |string | null;
   approvedAt?: string | null;
   rejectionReason?: string | null;
 }

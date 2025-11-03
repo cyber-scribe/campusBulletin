@@ -58,13 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     try {
-      const res = await API.get("/auth/me");
-      setUser(res.data.user);
-      return true;
-    } catch (error) {
-      localStorage.removeItem("token");
-      setUser(null);
-      return false;
+      const res = await API.get(`/auth/me?_t=${Date.now()}`);
+    setUser(res.data.user);
+    return true;
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    localStorage.removeItem("token");
+    setUser(null);
+    return false;
     }
   };
 
