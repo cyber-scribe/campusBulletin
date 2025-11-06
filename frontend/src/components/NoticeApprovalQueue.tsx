@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Notice } from "@/types/notice";
-import { NOTICE_STATUS, NoticeStatus } from "@/auth/roles";
 import API from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { CheckCircle, XCircle, Eye, User, Clock } from "lucide-react";
@@ -13,7 +12,6 @@ const NoticeApprovalQueue = () => {
   const [pendingNotices, setPendingNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<NoticeStatus | "">("");
   const router = useRouter();
   const { isAdmin } = useAuth();
 
@@ -35,14 +33,12 @@ const NoticeApprovalQueue = () => {
       console.log("Admin Approval Queue - API Response:", response.data);
       
       // Get all notices from response
-      const allNotices = response.data.notices || [];
+      const allNotices: Notice[] = response.data.notices || [];
       console.log("All notices:", allNotices);
       
       // Filter to show ALL pending notices from ANY user (admin sees everything)
       const pendingNotices = allNotices.filter(notice => {
-        const isPending = notice.status === 'pending_approval' || 
-                         notice.status === 'PENDING_APPROVAL' ||
-                         notice.status === 'pending';
+        const isPending = notice.status === 'pending_approval';
         
         console.log("Notice:", notice.title, "Status:", notice.status, "Is Pending:", isPending);
         return isPending;

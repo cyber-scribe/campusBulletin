@@ -6,6 +6,14 @@ const { NOTICE_STATUS, ROLES } = require('../auth/roles');
 
 const getNotices = async (req, res) => {
   try {
+    console.log("\n========== GET NOTICES REQUEST ==========");
+    console.log("👤 User:", req.user ? {
+      id: req.user._id,
+      name: req.user.name,
+      roles: req.user.roles
+    } : "Not authenticated");
+    console.log("🔍 Query params:", req.query);
+    
     const { category, search, page = 1, limit = 10, status } = req.query;
     
     let query = { isActive: true };
@@ -57,13 +65,21 @@ const getNotices = async (req, res) => {
     }
 
     const notices = await Notice.find(query)
-      .populate('createdBy', 'name email')
-      .populate('approvedBy', 'name email')
+      .populate('createdBy', '_id name email')
+      .populate('approvedBy', '_id name email')
       .sort({ datePosted: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
     const total = await Notice.countDocuments(query);
+
+    console.log("📊 Query used:", JSON.stringify(query, null, 2));
+    console.log("📦 Found", notices.length, "notices");
+    console.log("📋 Notice details:");
+    notices.forEach((notice, index) => {
+      console.log(`  ${index + 1}. ${notice.title} - Status: ${notice.status} - CreatedBy: ${notice.createdBy?._id || notice.createdBy}`);
+    });
+    console.log("==========================================\n");
 
     res.json({
       success: true,
@@ -96,7 +112,16 @@ const getNotice = async (req, res) => {
 
 const createNotice = async (req, res) => {
   try {
+    console.log("\n========== CREATE NOTICE REQUEST ==========");
+    console.log("📝 Request Body:", req.body);
+    console.log("👤 User:", {
+      id: req.user._id,
+      name: req.user.name,
+      roles: req.user.roles
+    });
+    
     const { title, category, status } = req.body;
+    console.log("📋 Parsed Data:", { title, category, status });
 
     let fileUrl = null;
     let filePublicId = null;
@@ -151,22 +176,27 @@ const createNotice = async (req, res) => {
     let approvedBy = null;
     let approvedAt = null;
     
+    console.log("🔍 Determining status...");
     if (req.user.roles.includes(ROLES.ADMIN)) {
       // Admins can create notices with any status
       initialStatus = status || NOTICE_STATUS.DRAFT;
+      console.log("👑 Admin creating notice with status:", initialStatus);
       
       // If admin is directly publishing, set approvedBy and approvedAt
       if (initialStatus === NOTICE_STATUS.PUBLISHED) {
         approvedBy = req.user._id;
         approvedAt = new Date();
+        console.log("✅ Auto-approving admin notice");
       }
     } else {
       // Staff can only create drafts or submit for approval
       initialStatus = status === NOTICE_STATUS.PENDING_APPROVAL ? 
         NOTICE_STATUS.PENDING_APPROVAL : NOTICE_STATUS.DRAFT;
+      console.log("👨‍💼 Staff creating notice with status:", initialStatus);
     }
 
-    const notice = await Notice.create({
+    console.log("💾 Creating notice in database...");
+    const noticeData = {
       title,
       category,
       fileUrl,
@@ -175,11 +205,23 @@ const createNotice = async (req, res) => {
       createdBy: req.user._id,
       approvedBy: initialStatus === NOTICE_STATUS.PUBLISHED ? req.user._id : null,
       approvedAt: initialStatus === NOTICE_STATUS.PUBLISHED ? new Date() : null
-    });
+    };
+    console.log("📦 Notice data:", noticeData);
+
+    const notice = await Notice.create(noticeData);
+
+    console.log("✅ NOTICE CREATED SUCCESSFULLY!");
+    console.log("🆔 Notice ID:", notice._id);
+    console.log("📌 Notice Status:", notice.status);
+    console.log("👤 Created By:", notice.createdBy);
+    console.log("==========================================\n");
 
     res.status(201).json({ success: true, notice });
   } catch (error) {
-    console.error("Create notice error:", error);
+    console.error("\n❌ CREATE NOTICE ERROR ❌");
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    console.error("==========================================\n");
 
     // Clean up tmp file if error
     if (req.file) {
@@ -190,7 +232,7 @@ const createNotice = async (req, res) => {
       }
     }
 
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -365,7 +407,7 @@ const approveNotice = async (req, res) => {
         approvedAt: new Date()
       },
       { new: true }
-    ).populate('createdBy', 'name email');
+    ).populate('createdBy', '_id name email');
 
     res.json({ 
       success: true, 
@@ -378,7 +420,7 @@ const approveNotice = async (req, res) => {
   }
 };
 
-// Reject a notice (Admin only)
+// Reject a notice (Admin only) - Deletes the notice
 const rejectNotice = async (req, res) => {
   try {
     const { rejectionReason } = req.body;
@@ -395,21 +437,17 @@ const rejectNotice = async (req, res) => {
       });
     }
 
-    const updatedNotice = await Notice.findByIdAndUpdate(
-      req.params.id,
-      { 
-        status: NOTICE_STATUS.REJECTED,
-        rejectionReason: rejectionReason || 'No reason provided',
-        rejectedBy: req.user._id,
-        rejectedAt: new Date()
-      },
-      { new: true }
-    ).populate('createdBy', 'name email');
+    // Delete the file from Cloudinary if it exists
+    if (notice.filePublicId) {
+      await cloudinary.uploader.destroy(notice.filePublicId);
+    }
+
+    // Delete the notice from database
+    await Notice.findByIdAndDelete(req.params.id);
 
     res.json({ 
       success: true, 
-      notice: updatedNotice,
-      message: 'Notice rejected successfully'
+      message: 'Notice rejected and deleted successfully'
     });
   } catch (error) {
     console.error('Reject notice error:', error);

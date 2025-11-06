@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Notice } from "@/types/notice";
-import { NOTICE_STATUS } from "@/auth/roles";
 import API from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Edit, Trash2, Eye, Send, FileText } from "lucide-react";
@@ -16,7 +15,7 @@ const StaffDraftQueue = () => {
   const router = useRouter();
   const { user, isStaff } = useAuth();
 
-  const fetchDraftNotices = async () => {
+  const fetchDraftNotices = useCallback(async () => {
     try {
       setLoading(true);
       const response = await API.get("/notices");
@@ -25,7 +24,7 @@ const StaffDraftQueue = () => {
       console.log("Current user:", user);
       
       // Get all notices from response
-      const allNotices = response.data.notices || [];
+      const allNotices: Notice[] = response.data.notices || [];
       console.log("All notices:", allNotices);
       
       // Filter notices to only show drafts created by the current user
@@ -43,7 +42,7 @@ const StaffDraftQueue = () => {
                             (typeof notice.createdBy === 'object' && notice.createdBy?._id === user?.id) ||
                             (typeof notice.createdBy === 'object' && notice.createdBy?.id === user?.id);
         
-        const isDraft = notice.status === 'draft' || notice.status === 'DRAFT';
+        const isDraft = notice.status === 'draft';
         
         console.log("Is user notice:", isUserNotice);
         console.log("Is draft:", isDraft);
@@ -62,7 +61,7 @@ const StaffDraftQueue = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     // Redirect if not staff
@@ -72,7 +71,7 @@ const StaffDraftQueue = () => {
     }
 
     fetchDraftNotices();
-  }, [isStaff, router]);
+  }, [isStaff, router, fetchDraftNotices]);
 
   const handleDelete = async (noticeId: string) => {
     if (!confirm("Are you sure you want to delete this draft?")) return;

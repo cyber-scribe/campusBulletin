@@ -27,7 +27,7 @@ export default function StaffEditNoticePage() {
         const noticeData = res.data;
         // Check if createdBy is an object before accessing properties
         const createdById = typeof noticeData.createdBy === 'object' && noticeData.createdBy !== null
-          ? noticeData.createdBy.id
+          ? noticeData.createdBy._id
           : noticeData.createdBy;
 
          // Check if user owns this notice

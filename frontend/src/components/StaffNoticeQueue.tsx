@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Notice } from "@/types/notice";
-import { NOTICE_STATUS, NoticeStatus } from "@/auth/roles";
 import API from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Clock, Eye, Edit, Trash2 } from "lucide-react";
@@ -16,50 +15,23 @@ const StaffNoticeQueue = () => {
   const router = useRouter();
   const { user, isStaff } = useAuth();
 
-  useEffect(() => {
-    // Redirect if not staff
-    if (!isStaff) {
-      router.push("/");
-      return;
-    }
-
-    fetchPendingNotices();
-  }, [isStaff, router]);
-
-  const fetchPendingNotices = async () => {
+  const fetchPendingNotices = useCallback(async () => {
     try {
       setLoading(true);
       const response = await API.get("/notices");
       
-      console.log("Pending API Response:", response.data);
-      console.log("Current user:", user);
+      const allNotices: Notice[] = response.data.notices || [];
       
-      // Get all notices from response
-      const allNotices = response.data.notices || [];
-      console.log("All notices for pending:", allNotices);
-      
-      // Filter notices to only show pending approval created by the current user
-      const userNotices = allNotices.filter(notice => {
-        console.log("Checking pending notice:", notice);
-        console.log("Notice createdBy:", notice.createdBy);
-        console.log("Notice status:", notice.status);
-        
-        // Check if this notice belongs to current user and is pending approval
+      const userNotices = allNotices.filter((notice: Notice) => {
         const isUserNotice = notice.createdBy === user?.id || 
                             (typeof notice.createdBy === 'object' && notice.createdBy?._id === user?.id) ||
                             (typeof notice.createdBy === 'object' && notice.createdBy?.id === user?.id);
         
-        const isPending = notice.status === 'pending_approval' || 
-                         notice.status === 'PENDING_APPROVAL' ||
-                         notice.status === 'pending';
-        
-        console.log("Is user notice:", isUserNotice);
-        console.log("Is pending:", isPending);
+        const isPending = notice.status === 'pending_approval';
         
         return isUserNotice && isPending;
       });
       
-      console.log("Filtered pending user notices:", userNotices);
       setPendingNotices(userNotices);
       setError(null);
     } catch (err) {
@@ -68,14 +40,21 @@ const StaffNoticeQueue = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (isStaff) {
+      fetchPendingNotices();
+    } else {
+      router.push("/");
+    }
+  }, [isStaff, router, fetchPendingNotices]);
 
   const handleDelete = async (noticeId: string) => {
     if (!confirm("Are you sure you want to delete this notice?")) return;
     
     try {
       await API.delete(`/notices/${noticeId}`);
-      // Remove from list
       setPendingNotices(pendingNotices.filter(notice => notice._id !== noticeId));
       alert("Notice deleted successfully.");
     } catch (err) {
@@ -85,23 +64,28 @@ const StaffNoticeQueue = () => {
   };
 
   if (!isStaff) {
-    return null; // Don't render anything if not staff
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <div className="w-8 h-8 border-4 border-yellow-400/50 border-t-yellow-400 rounded-full animate-spin"></div>
+        <p className="ml-3 text-white/70 font-medium">Loading pending notices...</p>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-2xl blur-xl"></div>
-        <div className="relative p-6 rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-red-400/30 shadow-2xl">
-          <p className="text-red-300 font-medium">{error}</p>
-        </div>
+      <div className="relative p-6 rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-red-400/30 shadow-2xl">
+        <p className="text-red-300 font-medium">{error}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-2xl blur-xl"></div>
         <div className="relative p-6 rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-white/30 shadow-2xl">
@@ -119,7 +103,6 @@ const StaffNoticeQueue = () => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 via-transparent to-orange-500/10 rounded-2xl blur-xl"></div>
         <div className="relative overflow-x-auto rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-white/30 shadow-2xl">
@@ -133,16 +116,7 @@ const StaffNoticeQueue = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td className="px-6 py-8" colSpan={4}>
-                    <div className="flex justify-center items-center">
-                      <div className="w-8 h-8 border-4 border-yellow-400/50 border-t-yellow-400 rounded-full animate-spin"></div>
-                      <p className="ml-3 text-white/70 font-medium">Loading pending notices...</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : pendingNotices.length === 0 ? (
+              {pendingNotices.length === 0 ? (
                 <tr>
                   <td className="px-6 py-12 text-center" colSpan={4}>
                     <div className="flex flex-col items-center gap-3">

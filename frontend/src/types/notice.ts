@@ -1,10 +1,12 @@
 import { NoticeStatus } from "@/auth/roles";
 
 export interface User {
+  _id: string;
   id: string;
   name: string;
   email: string;
   roles: string[];
+  designation?: string;
 }
 
 export interface Notice {
@@ -14,8 +16,8 @@ export interface Notice {
   fileUrl?: string;
   createdAt: string;
   status: NoticeStatus;
-  createdBy:  User["name"] | string;
-  approvedBy?: User["name"] |string | null;
+  createdBy: User | string;
+  approvedBy?: User | string | null;
   approvedAt?: string | null;
   rejectionReason?: string | null;
 }

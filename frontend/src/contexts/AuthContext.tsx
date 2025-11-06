@@ -12,6 +12,7 @@ type User = {
   roles: string[];
   studentId?: string | null;
   department?: string | null;
+  designation?: string | null;
   branch?: string | null;
   year?: string | null;
   avatarUrl?: string | null;

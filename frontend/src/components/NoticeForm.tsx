@@ -77,6 +77,7 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
         },
       });
       console.log("Update response:", response.data);
+      return response.data;
     } else {
       console.log("Creating new notice");
       const response = await API.post("/notices", formData, {
@@ -85,6 +86,7 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
         },
       });
       console.log("Create response:", response.data);
+      return response.data;
     }
   };
 
@@ -117,7 +119,18 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
     setError("");
 
     try {
-      await persistNotice(status);
+      const result = await persistNotice(status);
+      console.log("Notice saved successfully:", result);
+      
+      // Show success message based on status
+      if (status === NOTICE_STATUS.DRAFT) {
+        alert("Notice saved as draft successfully!");
+      } else if (status === NOTICE_STATUS.PENDING_APPROVAL) {
+        alert("Notice submitted for approval successfully!");
+      } else if (status === NOTICE_STATUS.PUBLISHED) {
+        alert("Notice published successfully!");
+      }
+      
       handleSuccessNavigation();
     } catch (err: any) {
       console.error("Error submitting notice:", err);
@@ -143,12 +156,16 @@ const submitForApproval = async (e?: React.FormEvent) => {
     setIsSubmitting(true);
 
     if (notice?._id) {
-      await API.patch(`/notices/${notice._id}/submit`);
+      const result = await API.patch(`/notices/${notice._id}/submit`);
+      console.log("Notice submitted for approval:", result.data);
       setStatus(NOTICE_STATUS.PENDING_APPROVAL);
+      alert("Notice submitted for approval successfully!");
       handleSuccessNavigation();
     } else {
-      await persistNotice(NOTICE_STATUS.PENDING_APPROVAL);
+      const result = await persistNotice(NOTICE_STATUS.PENDING_APPROVAL);
+      console.log("Notice created and submitted for approval:", result);
       setStatus(NOTICE_STATUS.PENDING_APPROVAL);
+      alert("Notice submitted for approval successfully!");
       handleSuccessNavigation();
     }
   } catch (err: any) {
