@@ -1,5 +1,13 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+let nodemailer;
+try {
+  nodemailer = require('nodemailer');
+} catch (err) {
+  console.warn('Nodemailer is not installed. Password reset emails will be logged to the console.');
+}
+
 const User = require('../models/User');
 const { ROLES } = require('../auth/roles');
 const cloudinary = require('../config/cloudinary');
@@ -7,6 +15,41 @@ const fs = require('fs').promises;
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
+
+const getFrontendBaseUrl = () => process.env.FRONTEND_URL || 'http://localhost:3000';
+
+const sendPasswordResetEmail = async ({ email, name, resetUrl }) => {
+  const subject = 'Campus Bulletin Password Reset Request';
+  const text = `Hi ${name || 'there'},\n\n` +
+    'We received a request to reset the password for your Campus Bulletin account. ' +
+    'If you made this request, click the link below to set a new password.\n\n' +
+    `${resetUrl}\n\n` +
+    'This link will expire in 15 minutes. If you did not request a password reset, no further action is required.\n\n' +
+    'Best regards,\nCampus Bulletin Team';
+
+  if (nodemailer) {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: email,
+      subject,
+      text
+    });
+  } else {
+    console.info('Password reset email (console fallback):');
+    console.info('To:', email);
+    console.info(text);
+  }
 };
 
 const loginAdmin = async (req, res) => {
@@ -316,6 +359,78 @@ const getUserById = async (req, res) => {
   }
 };
 
+// Forgot password - request reset link
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
+
+  const user = await User.findOne({ email });
+
+  if (user) {
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save({ validateBeforeSave: false });
+
+    const resetUrl = `${getFrontendBaseUrl()}/auth/reset-password/${resetToken}`;
+
+    try {
+      await sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        resetUrl
+      });
+    } catch (error) {
+      user.passwordResetToken = null;
+      user.passwordResetExpires = null;
+      await user.save({ validateBeforeSave: false });
+      console.error('Failed to send password reset email:', error);
+      return res.status(500).json({ message: 'Failed to send reset email. Please try again later.' });
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: 'If an account with that email exists, a password reset link has been sent.'
+  });
+};
+
+// Reset password using token
+const resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ message: 'Token and new password are required' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    return res.status(400).json({ message: 'Token is invalid or has expired' });
+  }
+
+  user.password = password;
+  user.passwordResetToken = null;
+  user.passwordResetExpires = null;
+  await user.save();
+
+  res.json({ success: true, message: 'Password reset successful. You can now log in with your new password.' });
+};
+
 module.exports = { 
   loginAdmin, 
   createAdmin, 
@@ -327,7 +442,9 @@ module.exports = {
   updateProfile,
   changePassword,
   uploadAvatar,
-  getUserById
+  getUserById,
+  forgotPassword,
+  resetPassword
 };
 
 // Update current user's profile
