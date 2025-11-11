@@ -12,7 +12,8 @@ const {
   uploadAvatar,
   getUserById,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  verifyEmail
 } = require('../controllers/authController');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -39,6 +40,7 @@ router.post('/me/avatar', auth, upload.single('avatar'), uploadAvatar);
 router.get('/user/:id', auth, getUserById);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
+router.get('/verify-email/:token', verifyEmail);
 
 module.exports = router;
 
