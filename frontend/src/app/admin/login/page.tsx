@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <main className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md bg-white p-8 rounded-xl shadow">
         <h1 className="text-2xl font-bold text-center mb-6">Admin Login</h1>
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>

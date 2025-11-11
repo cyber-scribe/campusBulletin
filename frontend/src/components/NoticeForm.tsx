@@ -33,6 +33,7 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
   console.log("Notice status:", notice?.status);
   
   const [title, setTitle] = useState(notice?.title || "");
+  const [description, setDescription] = useState(notice?.description || "");
   const [category, setCategory] = useState<string>(notice?.category || CATEGORIES[0]);
   const [file, setFile] = useState<File | null>(null);
   const [existingFileUrl, setExistingFileUrl] = useState<string | undefined>(notice?.fileUrl);
@@ -41,27 +42,39 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
   const [status, setStatus] = useState<NoticeStatus>(
     notice?.status 
       ? (notice.status as NoticeStatus) 
-      : (isAdmin ? NOTICE_STATUS.PUBLISHED : NOTICE_STATUS.DRAFT)
+      : (isAdmin
+          ? NOTICE_STATUS.PUBLISHED
+          : isStaff
+            ? NOTICE_STATUS.PENDING_APPROVAL
+            : NOTICE_STATUS.DRAFT)
   );
+  const [createdNoticeId, setCreatedNoticeId] = useState<string | undefined>(notice?._id);
 
   // Update form fields when notice prop changes
   useEffect(() => {
     if (notice) {
       console.log("Updating form fields with notice data:", notice);
       setTitle(notice.title || "");
+      setDescription(notice.description || "");
       setCategory(notice.category || CATEGORIES[0]);
       setExistingFileUrl(notice.fileUrl);
       setStatus(
         notice.status 
           ? (notice.status as NoticeStatus) 
-          : (isAdmin ? NOTICE_STATUS.PUBLISHED : NOTICE_STATUS.DRAFT)
+          : (isAdmin
+              ? NOTICE_STATUS.PUBLISHED
+              : isStaff
+                ? NOTICE_STATUS.PENDING_APPROVAL
+                : NOTICE_STATUS.DRAFT)
       );
+      setCreatedNoticeId(notice._id);
     }
   }, [notice, isAdmin]);
 
   const persistNotice = async (statusToPersist: NoticeStatus) => {
     const formData = new FormData();
     formData.append("title", title);
+    formData.append("description", description);
     formData.append("category", category);
     formData.append("status", statusToPersist);
 
@@ -69,9 +82,11 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
       formData.append("file", file);
     }
 
-    if (notice?._id) {
-      console.log("Updating notice with ID:", notice._id);
-      const response = await API.put(`/notices/${notice._id}`, formData, {
+    const targetId = notice?._id || createdNoticeId;
+
+    if (targetId) {
+      console.log("Updating notice with ID:", targetId);
+      const response = await API.put(`/notices/${targetId}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -86,6 +101,9 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
         },
       });
       console.log("Create response:", response.data);
+      if (response.data?.notice?._id) {
+        setCreatedNoticeId(response.data.notice._id);
+      }
       return response.data;
     }
   };
@@ -119,15 +137,16 @@ export default function NoticeForm({ notice, onSuccess }: NoticeFormProps) {
     setError("");
 
     try {
-      const result = await persistNotice(status);
+      const targetStatus = isStaff && !isAdmin ? NOTICE_STATUS.PENDING_APPROVAL : status;
+      const result = await persistNotice(targetStatus);
       console.log("Notice saved successfully:", result);
       
       // Show success message based on status
-      if (status === NOTICE_STATUS.DRAFT) {
+      if (targetStatus === NOTICE_STATUS.DRAFT) {
         alert("Notice saved as draft successfully!");
-      } else if (status === NOTICE_STATUS.PENDING_APPROVAL) {
+      } else if (targetStatus === NOTICE_STATUS.PENDING_APPROVAL) {
         alert("Notice submitted for approval successfully!");
-      } else if (status === NOTICE_STATUS.PUBLISHED) {
+      } else if (targetStatus === NOTICE_STATUS.PUBLISHED) {
         alert("Notice published successfully!");
       }
       
@@ -155,8 +174,10 @@ const submitForApproval = async (e?: React.FormEvent) => {
   try {
     setIsSubmitting(true);
 
-    if (notice?._id) {
-      const result = await API.patch(`/notices/${notice._id}/submit`);
+    const targetId = notice?._id || createdNoticeId;
+
+    if (targetId) {
+      const result = await API.patch(`/notices/${targetId}/submit`);
       console.log("Notice submitted for approval:", result.data);
       setStatus(NOTICE_STATUS.PENDING_APPROVAL);
       alert("Notice submitted for approval successfully!");
@@ -206,6 +227,22 @@ const submitForApproval = async (e?: React.FormEvent) => {
             onChange={(e) => setTitle(e.target.value)}
             className="w-full border border-white/20 rounded-xl p-3 bg-white/5 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-300"
             placeholder="e.g., Mid-Semester Exam Schedule"
+          />
+        </div>
+
+        {/* Description Field */}
+        <div className="space-y-2">
+          <label htmlFor="description" className="block text-sm font-medium text-white/80">
+            Description *
+          </label>
+          <textarea
+            id="description"
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={5}
+            className="w-full border border-white/20 rounded-xl p-3 bg-white/5 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-300 resize-y"
+            placeholder="Provide the full notice details, including important context and next steps"
           />
         </div>
 
@@ -276,45 +313,6 @@ const submitForApproval = async (e?: React.FormEvent) => {
           </div>
         </div>
 
-        {/* Status selection for new notices (not for editing) */}
-        {!notice?._id && isStaff && (
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-white/80">
-              Submission Type
-            </label>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/20 hover:bg-white/10 transition-all duration-300 cursor-pointer">
-                <input
-                  type="radio"
-                  className="w-4 h-4 text-purple-400 bg-white/10 border-white/30 focus:ring-purple-400/50 focus:ring-2"
-                  name="status"
-                  value={NOTICE_STATUS.DRAFT}
-                  checked={status === NOTICE_STATUS.DRAFT}
-                  onChange={() => setStatus(NOTICE_STATUS.DRAFT)}
-                />
-                <div className="flex items-center gap-2">
-                  <Save className="h-4 w-4 text-white/70" />
-                  <span className="text-white font-medium">Save as Draft</span>
-                </div>
-              </label>
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/20 hover:bg-white/10 transition-all duration-300 cursor-pointer">
-                <input
-                  type="radio"
-                  className="w-4 h-4 text-purple-400 bg-white/10 border-white/30 focus:ring-purple-400/50 focus:ring-2"
-                  name="status"
-                  value={NOTICE_STATUS.PENDING_APPROVAL}
-                  checked={status === NOTICE_STATUS.PENDING_APPROVAL}
-                  onChange={() => setStatus(NOTICE_STATUS.PENDING_APPROVAL)}
-                />
-                <div className="flex items-center gap-2">
-                  <Send className="h-4 w-4 text-white/70" />
-                  <span className="text-white font-medium">Submit for Approval</span>
-                </div>
-              </label>
-            </div>
-          </div>
-        )}
-
         {/* Status selection for admins editing notices */}
         {notice?._id && isAdmin && (
           <div className="space-y-3">
@@ -376,8 +374,17 @@ const submitForApproval = async (e?: React.FormEvent) => {
               </>
             ) : (
               <>
-                <Save className="h-4 w-4" />
-                {notice?._id ? "Update Notice" : "Create Notice"}
+                {isStaff && !isAdmin && !notice?._id ? (
+                  <>
+                    <Send className="h-4 w-4" />
+                    Submit for Approval
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    {notice?._id ? "Update Notice" : "Create Notice"}
+                  </>
+                )}
               </>
             )}
           </button>

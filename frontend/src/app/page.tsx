@@ -113,7 +113,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-row min-h-screen">
+    <div className="flex flex-row min-h-screen min-h-[100dvh]">
       {/* Left Panel */}
       <div
         className="flex w-1/2 justify-center items-center text-white text-5xl font-extrabold tracking-wide shadow-2xl"

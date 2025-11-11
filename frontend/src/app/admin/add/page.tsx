@@ -12,7 +12,7 @@ export default function AddNoticePage() {
 
   return (
     <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.STAFF]}>
-      <div className="min-h-screen" style={{
+      <div className="min-h-screen min-h-[100dvh]" style={{
         background: "linear-gradient(125deg,rgb(28, 28, 31),rgb(71, 65, 140),rgb(26, 26, 67))"
       }}>
         <main className="max-w-4xl mx-auto p-6">

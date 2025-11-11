@@ -9,7 +9,8 @@ const {
   createStaff,
   updateProfile,
   changePassword,
-  uploadAvatar
+  uploadAvatar,
+  getUserById
 } = require('../controllers/authController');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -33,6 +34,7 @@ router.get('/me', auth, getCurrentUser);
 router.put('/me', auth, updateProfile);
 router.put('/me/password', auth, changePassword);
 router.post('/me/avatar', auth, upload.single('avatar'), uploadAvatar);
+router.get('/user/:id', auth, getUserById);
 
 module.exports = router;
 

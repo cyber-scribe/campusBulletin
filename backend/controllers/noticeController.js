@@ -4,6 +4,42 @@ const fs = require('fs').promises;
 const { NOTICE_STATUS, ROLES } = require('../auth/roles');
 
 
+const parsePagination = (page = '1', limit = '50') => {
+  const pageValue = Array.isArray(page) ? page[0] : page;
+  const limitValue = Array.isArray(limit) ? limit[0] : limit;
+
+  const pageNumber = Math.max(parseInt(pageValue, 10) || 1, 1);
+
+  let limitNumber;
+  if (!limitValue) {
+    limitNumber = 50;
+  } else if (typeof limitValue === 'string' && limitValue.toLowerCase() === 'all') {
+    limitNumber = 0;
+  } else {
+    const parsedLimit = parseInt(limitValue, 10);
+    limitNumber = Number.isNaN(parsedLimit) ? 50 : Math.max(parsedLimit, 0);
+  }
+
+  return { pageNumber, limitNumber };
+};
+
+const applyPagination = (queryBuilder, pageNumber, limitNumber) => {
+  if (limitNumber > 0) {
+    queryBuilder = queryBuilder
+      .limit(limitNumber)
+      .skip((pageNumber - 1) * limitNumber);
+  }
+  return queryBuilder;
+};
+
+const populateNoticeRefs = (queryBuilder) => {
+  return queryBuilder
+    .populate('createdBy', '_id name email')
+    .populate('approvedBy', '_id name email')
+    .populate('rejectedBy', '_id name email')
+    .sort({ datePosted: -1, createdAt: -1 });
+};
+
 const getNotices = async (req, res) => {
   try {
     console.log("\n========== GET NOTICES REQUEST ==========");
@@ -14,8 +50,10 @@ const getNotices = async (req, res) => {
     } : "Not authenticated");
     console.log("🔍 Query params:", req.query);
     
-    const { category, search, page = 1, limit = 10, status } = req.query;
-    
+    const { category, search, page = '1', limit = '50', status } = req.query;
+
+    const { pageNumber, limitNumber } = parsePagination(page, limit);
+
     let query = { isActive: true };
     
     // Filter by category if provided
@@ -64,12 +102,10 @@ const getNotices = async (req, res) => {
       query.status = NOTICE_STATUS.PUBLISHED;
     }
 
-    const notices = await Notice.find(query)
-      .populate('createdBy', '_id name email')
-      .populate('approvedBy', '_id name email')
-      .sort({ datePosted: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    let queryBuilder = populateNoticeRefs(Notice.find(query));
+    queryBuilder = applyPagination(queryBuilder, pageNumber, limitNumber);
+
+    const notices = await queryBuilder;
 
     const total = await Notice.countDocuments(query);
 
@@ -85,9 +121,10 @@ const getNotices = async (req, res) => {
       success: true,
       notices,
       pagination: {
-        current: page,
-        pages: Math.ceil(total / limit),
-        total
+        current: pageNumber,
+        pages: limitNumber > 0 ? Math.ceil(total / limitNumber) : 1,
+        total,
+        limit: limitNumber
       }
     });
   } catch (error) {
@@ -98,13 +135,80 @@ const getNotices = async (req, res) => {
 
 const getNotice = async (req, res) => {
   try {
-    const notice = await Notice.findById(req.params.id);
+    const notice = await Notice.findById(req.params.id)
+      .populate('createdBy', '_id name email')
+      .populate('approvedBy', '_id name email')
+      .populate('rejectedBy', '_id name email');
     if (!notice) {
       return res.status(404).json({ message: 'Notice not found' });
     }
     res.json({ success: true, notice });
   } catch (error) {
     console.error('Get notice error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getMyNotices = async (req, res) => {
+  try {
+    const { status, page = '1', limit = '50' } = req.query;
+
+    const { pageNumber, limitNumber } = parsePagination(page, limit);
+
+    const query = { createdBy: req.user._id };
+
+    if (typeof status === 'string' && Object.values(NOTICE_STATUS).includes(status)) {
+      query.status = status;
+    }
+
+    let queryBuilder = populateNoticeRefs(Notice.find(query));
+    queryBuilder = applyPagination(queryBuilder, pageNumber, limitNumber);
+
+    const notices = await queryBuilder;
+    const total = await Notice.countDocuments(query);
+
+    res.json({
+      success: true,
+      notices,
+      pagination: {
+        current: pageNumber,
+        pages: limitNumber > 0 ? Math.ceil(total / limitNumber) : 1,
+        total,
+        limit: limitNumber
+      }
+    });
+  } catch (error) {
+    console.error('Get my notices error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getPendingApprovalNotices = async (req, res) => {
+  try {
+    const { page = '1', limit = '50' } = req.query;
+
+    const { pageNumber, limitNumber } = parsePagination(page, limit);
+
+    const query = { status: NOTICE_STATUS.PENDING_APPROVAL };
+
+    let queryBuilder = populateNoticeRefs(Notice.find(query));
+    queryBuilder = applyPagination(queryBuilder, pageNumber, limitNumber);
+
+    const notices = await queryBuilder;
+    const total = await Notice.countDocuments(query);
+
+    res.json({
+      success: true,
+      notices,
+      pagination: {
+        current: pageNumber,
+        pages: limitNumber > 0 ? Math.ceil(total / limitNumber) : 1,
+        total,
+        limit: limitNumber
+      }
+    });
+  } catch (error) {
+    console.error('Get pending approval notices error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -120,8 +224,13 @@ const createNotice = async (req, res) => {
       roles: req.user.roles
     });
     
-    const { title, category, status } = req.body;
-    console.log("📋 Parsed Data:", { title, category, status });
+    const { title, description, category, status } = req.body;
+    console.log("📋 Parsed Data:", { title, description, category, status });
+
+    if (!description || !description.trim()) {
+      console.log("⚠️ Missing description in request");
+      return res.status(400).json({ message: "Description is required" });
+    }
 
     let fileUrl = null;
     let filePublicId = null;
@@ -198,6 +307,7 @@ const createNotice = async (req, res) => {
     console.log("💾 Creating notice in database...");
     const noticeData = {
       title,
+      description: description.trim(),
       category,
       fileUrl,
       filePublicId,
@@ -243,7 +353,7 @@ const updateNotice = async (req, res) => {
     console.log('Request body:', req.body);
     console.log('Request file:', req.file);
     
-    const { title, category, status } = req.body;
+    const { title, description, category, status } = req.body;
     const notice = await Notice.findById(req.params.id);
     
     if (!notice) {
@@ -319,6 +429,7 @@ const updateNotice = async (req, res) => {
 
     const updateData = {
       title,
+      description: typeof description === 'string' && description.trim() !== '' ? description : notice.description,
       category,
       fileUrl,
       filePublicId,
@@ -404,10 +515,16 @@ const approveNotice = async (req, res) => {
       { 
         status: NOTICE_STATUS.PUBLISHED,
         approvedBy: req.user._id,
-        approvedAt: new Date()
+        approvedAt: new Date(),
+        rejectionReason: null,
+        rejectedBy: null,
+        rejectedAt: null
       },
       { new: true }
-    ).populate('createdBy', '_id name email');
+    )
+      .populate('createdBy', '_id name email')
+      .populate('approvedBy', '_id name email')
+      .populate('rejectedBy', '_id name email');
 
     res.json({ 
       success: true, 
@@ -437,17 +554,26 @@ const rejectNotice = async (req, res) => {
       });
     }
 
-    // Delete the file from Cloudinary if it exists
-    if (notice.filePublicId) {
-      await cloudinary.uploader.destroy(notice.filePublicId);
-    }
-
-    // Delete the notice from database
-    await Notice.findByIdAndDelete(req.params.id);
+    const updatedNotice = await Notice.findByIdAndUpdate(
+      req.params.id,
+      {
+        status: NOTICE_STATUS.REJECTED,
+        rejectionReason: rejectionReason || 'No reason provided',
+        rejectedBy: req.user._id,
+        rejectedAt: new Date(),
+        approvedBy: null,
+        approvedAt: null
+      },
+      { new: true }
+    )
+      .populate('createdBy', '_id name email')
+      .populate('approvedBy', '_id name email')
+      .populate('rejectedBy', '_id name email');
 
     res.json({ 
       success: true, 
-      message: 'Notice rejected and deleted successfully'
+      message: 'Notice rejected successfully',
+      notice: updatedNotice
     });
   } catch (error) {
     console.error('Reject notice error:', error);
@@ -480,9 +606,19 @@ const submitForApproval = async (req, res) => {
 
     const updatedNotice = await Notice.findByIdAndUpdate(
       req.params.id,
-      { status: NOTICE_STATUS.PENDING_APPROVAL },
+      { 
+        status: NOTICE_STATUS.PENDING_APPROVAL,
+        approvedBy: null,
+        approvedAt: null,
+        rejectionReason: null,
+        rejectedBy: null,
+        rejectedAt: null
+      },
       { new: true }
-    );
+    )
+      .populate('createdBy', '_id name email')
+      .populate('approvedBy', '_id name email')
+      .populate('rejectedBy', '_id name email');
 
     res.json({ 
       success: true, 
@@ -498,6 +634,8 @@ const submitForApproval = async (req, res) => {
 module.exports = {
   getNotices,
   getNotice,
+  getMyNotices,
+  getPendingApprovalNotices,
   createNotice,
   updateNotice,
   deleteNotice,

@@ -51,8 +51,14 @@ export default function StudentDashboard() {
     (category === "" || notice.category === category)
   );
 
+  const getDescriptionPreview = (text: string = "") => {
+    const trimmed = text.trim();
+    if (!trimmed) return "—";
+    return trimmed.length > 85 ? `${trimmed.slice(0, 82)}…` : trimmed;
+  };
+
   return (
-    <div className="min-h-screen" style={{
+    <div className="min-h-screen min-h-[100dvh]" style={{
       background: "linear-gradient(125deg,rgb(28, 28, 31),rgb(71, 65, 140),rgb(26, 26, 67))"
     }}>
       <div className="max-w-6xl mx-auto p-4">
@@ -126,6 +132,7 @@ export default function StudentDashboard() {
               <thead className="bg-white/10 backdrop-blur-sm border-b border-white/20">
                 <tr>
                   <th className="text-left px-6 py-4 text-white font-bold text-base">Title</th>
+                  <th className="text-left px-6 py-4 text-white font-bold text-base">Description</th>
                   <th className="text-left px-6 py-4 text-white font-bold text-base">Category</th>
                   <th className="text-left px-6 py-4 text-white font-bold text-base">Date</th>
                   <th className="px-6 py-4 text-right text-white font-bold text-base">Actions</th>
@@ -134,7 +141,7 @@ export default function StudentDashboard() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td className="px-6 py-8" colSpan={4}>
+                    <td className="px-6 py-8" colSpan={5}>
                       <div className="flex justify-center items-center">
                         <div className="w-8 h-8 border-4 border-purple-400/50 border-t-purple-400 rounded-full animate-spin"></div>
                         <p className="ml-3 text-white/70 font-medium">Loading notices...</p>
@@ -143,7 +150,7 @@ export default function StudentDashboard() {
                   </tr>
                 ) : filteredNotices.length === 0 ? (
                   <tr>
-                    <td className="px-6 py-8 text-center text-white/70" colSpan={4}>
+                    <td className="px-6 py-8 text-center text-white/70" colSpan={5}>
                       No notices found.
                     </td>
                   </tr>
@@ -151,6 +158,9 @@ export default function StudentDashboard() {
                   filteredNotices.map((notice) => (
                     <tr key={notice._id} className="border-t border-white/10 hover:bg-white/5 transition-colors duration-200">
                       <td className="px-6 py-4 text-white font-medium">{notice.title}</td>
+                      <td className="px-6 py-4 text-white/80 max-w-xs">
+                        {getDescriptionPreview(notice.description)}
+                      </td>
                       <td className="px-6 py-4">
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-200 border border-purple-400/50">
                           {notice.category}
@@ -161,16 +171,12 @@ export default function StudentDashboard() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2 justify-end">
-                          {notice.fileUrl && (
-                            <a
-                              href={notice.fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-white hover:from-green-500/40 hover:to-emerald-500/40 transition-all duration-300 text-xs font-medium border border-green-400/40"
-                            >
-                              View
-                            </a>
-                          )}
+                          <Link
+                            href={`/notice/${notice._id}`}
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500/30 to-indigo-500/30 text-white hover:from-blue-500/40 hover:to-indigo-500/40 transition-all duration-300 text-xs font-medium border border-blue-400/40"
+                          >
+                            View
+                          </Link>
                         </div>
                       </td>
                     </tr>

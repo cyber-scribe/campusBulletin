@@ -6,6 +6,8 @@ const { ROLES } = require('../auth/roles');
 const {
   getNotices,
   getNotice,
+  getMyNotices,
+  getPendingApprovalNotices,
   createNotice,
   updateNotice,
   deleteNotice,
@@ -18,6 +20,22 @@ const router = express.Router();
 
 // Public routes - accessible to all users
 router.get('/', getNotices);
+
+// Authenticated notice queries
+router.get('/mine',
+  auth,
+  requireRole([ROLES.STAFF, ROLES.ADMIN]),
+  requirePermission('notices', 'read'),
+  getMyNotices
+);
+
+router.get('/pending',
+  auth,
+  requireRole([ROLES.ADMIN]),
+  requirePermission('notices', 'approve'),
+  getPendingApprovalNotices
+);
+
 router.get('/:id', getNotice);
 
 // Protected routes with role-based access control

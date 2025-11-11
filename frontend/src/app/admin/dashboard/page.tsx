@@ -71,6 +71,12 @@ export default function AdminDashboardPage() {
       (status === "" || n.status === status)
   );
 
+  const getDescriptionPreview = (text: string = "") => {
+    const trimmed = text.trim();
+    if (!trimmed) return "—";
+    return trimmed.length > 85 ? `${trimmed.slice(0, 82)}…` : trimmed;
+  };
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen" style={{
@@ -224,6 +230,7 @@ export default function AdminDashboardPage() {
                 <thead className="bg-white/10 backdrop-blur-sm border-b border-white/20">
                   <tr>
                     <th className="text-left px-6 py-4 text-white font-bold">Title</th>
+                    <th className="text-left px-6 py-4 text-white font-bold">Description</th>
                     <th className="text-left px-6 py-4 text-white font-bold">Category</th>
                     <th className="text-left px-6 py-4 text-white font-bold">Status</th>
                     <th className="text-left px-6 py-4 text-white font-bold">Date</th>
@@ -233,7 +240,7 @@ export default function AdminDashboardPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td className="px-6 py-8" colSpan={5}>
+                      <td className="px-6 py-8" colSpan={6}>
                         <div className="flex justify-center items-center">
                           <div className="w-8 h-8 border-4 border-purple-400/50 border-t-purple-400 rounded-full animate-spin"></div>
                           <p className="ml-3 text-white/70 font-medium">Loading notices...</p>
@@ -242,7 +249,7 @@ export default function AdminDashboardPage() {
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td className="px-6 py-8 text-center text-white/70" colSpan={5}>
+                      <td className="px-6 py-8 text-center text-white/70" colSpan={6}>
                         No notices found.
                       </td>
                     </tr>
@@ -250,6 +257,9 @@ export default function AdminDashboardPage() {
                     filtered.map((n) => (
                       <tr key={n._id} className="border-t border-white/10 hover:bg-white/5 transition-colors duration-200">
                         <td className="px-6 py-4 text-white font-medium">{n.title}</td>
+                        <td className="px-6 py-4 text-white/80 max-w-xs">
+                          {getDescriptionPreview(n.description)}
+                        </td>
                         <td className="px-6 py-4">
                           <span className="px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-200 border border-purple-400/30">
                             {n.category}

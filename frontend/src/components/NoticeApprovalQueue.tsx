@@ -3,15 +3,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Notice } from "@/types/notice";
 import API from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNoticeList } from "@/hooks/useNoticeList";
 import { CheckCircle, XCircle, Eye, User, Clock } from "lucide-react";
 
 const NoticeApprovalQueue = () => {
-  const [pendingNotices, setPendingNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { notices: pendingNotices, loading, error, refetch } = useNoticeList(
+    "/notices/pending"
+  );
+  const [actionError, setActionError] = useState<string | null>(null);
   const router = useRouter();
   const { isAdmin } = useAuth();
 
@@ -22,38 +23,7 @@ const NoticeApprovalQueue = () => {
       return;
     }
 
-    fetchPendingNotices();
   }, [isAdmin, router]);
-
-  const fetchPendingNotices = async () => {
-    try {
-      setLoading(true);
-      const response = await API.get("/notices");
-      
-      console.log("Admin Approval Queue - API Response:", response.data);
-      
-      // Get all notices from response
-      const allNotices: Notice[] = response.data.notices || [];
-      console.log("All notices:", allNotices);
-      
-      // Filter to show ALL pending notices from ANY user (admin sees everything)
-      const pendingNotices = allNotices.filter(notice => {
-        const isPending = notice.status === 'pending_approval';
-        
-        console.log("Notice:", notice.title, "Status:", notice.status, "Is Pending:", isPending);
-        return isPending;
-      });
-      
-      console.log("All pending notices for admin:", pendingNotices);
-      setPendingNotices(pendingNotices);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching pending notices:", err);
-      setError("Failed to load pending notices. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleApprove = async (noticeId: string) => {
     try {
@@ -61,15 +31,13 @@ const NoticeApprovalQueue = () => {
       const response = await API.patch(`/notices/${noticeId}/approve`);
       console.log("Approve response:", response.data);
       
-      // Remove from list and refresh
-      setPendingNotices(pendingNotices.filter(notice => notice._id !== noticeId));
+      // Refresh pending list
+      await refetch();
+      setActionError(null);
       alert("Notice approved and published successfully.");
-      
-      // Refresh the list to ensure consistency
-      await fetchPendingNotices();
     } catch (err) {
       console.error("Error approving notice:", err);
-      setError("Failed to approve notice. Please try again.");
+      setActionError("Failed to approve notice. Please try again.");
     }
   };
 
@@ -82,15 +50,13 @@ const NoticeApprovalQueue = () => {
       const response = await API.patch(`/notices/${noticeId}/reject`, { rejectionReason: reason });
       console.log("Reject response:", response.data);
       
-      // Remove from list and refresh
-      setPendingNotices(pendingNotices.filter(notice => notice._id !== noticeId));
+      // Refresh pending list
+      await refetch();
+      setActionError(null);
       alert("Notice rejected successfully. The staff has been notified.");
-      
-      // Refresh the list to ensure consistency
-      await fetchPendingNotices();
     } catch (err) {
       console.error("Error rejecting notice:", err);
-      setError("Failed to reject notice. Please try again.");
+      setActionError("Failed to reject notice. Please try again.");
     }
   };
 
@@ -98,12 +64,12 @@ const NoticeApprovalQueue = () => {
     return null; // Don't render anything if not admin
   }
 
-  if (error) {
+  if (error || actionError) {
     return (
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-2xl blur-xl"></div>
         <div className="relative p-6 rounded-2xl bg-white/15 backdrop-blur-2xl border-2 border-red-400/30 shadow-2xl">
-          <p className="text-red-300 font-medium">{error}</p>
+          <p className="text-red-300 font-medium">{actionError || error}</p>
         </div>
       </div>
     );

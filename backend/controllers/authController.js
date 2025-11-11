@@ -166,7 +166,7 @@ const getCurrentUser = async (req, res) => {
 // Student registration function
 const studentRegister = async (req, res) => {
   try {
-    const { name, email, password, studentId } = req.body;
+    const { name, email, password} = req.body;
     
     // Check if email already exists
     const existingEmail = await User.findOne({ email });
@@ -174,19 +174,18 @@ const studentRegister = async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
     
-    // Check if studentId already exists
-    if (studentId) {
-      const existingStudentId = await User.findOne({ studentId });
-      if (existingStudentId) {
-        return res.status(400).json({ message: 'Student ID already registered' });
-      }
-    }
+    // // Check if studentId already exists
+    // if (studentId) {
+    //   const existingStudentId = await User.findOne({ studentId });
+    //   if (existingStudentId) {
+    //     return res.status(400).json({ message: 'Student ID already registered' });
+    //   }
+    // }
     
     const student = await User.create({
       name,
       email,
       password,
-      studentId,
       roles: [ROLES.STUDENT]
     });
     
@@ -197,7 +196,6 @@ const studentRegister = async (req, res) => {
         id: student._id,
         name: student.name,
         email: student.email,
-        studentId: student.studentId,
         roles: student.roles
       }
     });
@@ -296,6 +294,28 @@ const staffLogin = async (req, res) => {
   }
 };
 
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('_id name email');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Get user by id error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = { 
   loginAdmin, 
   createAdmin, 
@@ -306,7 +326,8 @@ module.exports = {
   createStaff,
   updateProfile,
   changePassword,
-  uploadAvatar
+  uploadAvatar,
+  getUserById
 };
 
 // Update current user's profile

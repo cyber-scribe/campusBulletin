@@ -12,6 +12,7 @@ export interface User {
 export interface Notice {
   _id: string;
   title: string;
+  description: string;
   category: string;
   fileUrl?: string;
   createdAt: string;
@@ -20,4 +21,5 @@ export interface Notice {
   approvedBy?: User | string | null;
   approvedAt?: string | null;
   rejectionReason?: string | null;
+  rejectedBy?: User | string | null;
 }
