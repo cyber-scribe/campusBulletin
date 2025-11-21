@@ -242,7 +242,7 @@ const getCurrentUser = async (req, res) => {
 // Student registration function
 const studentRegister = async (req, res) => {
   try {
-    const { name, email, password} = req.body;
+    const { name, email, password } = req.body;
     
     // Check if email already exists
     const existingEmail = await User.findOne({ email });
@@ -259,11 +259,12 @@ const studentRegister = async (req, res) => {
       password,
       roles: [ROLES.STUDENT],
       verificationToken: verificationTokenHashed,
-      verificationTokenExpires: Date.now() + 24 * 60 * 60 * 1000
+      verificationTokenExpires: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
     });
 
+    // Send verification email
     const verificationUrl = `${getFrontendBaseUrl()}/auth/verify-email?token=${verificationTokenPlain}`;
-
+    
     try {
       await sendVerificationEmail({
         email: student.email,
@@ -308,12 +309,6 @@ const studentLogin = async (req, res) => {
     if (!user.roles.includes(ROLES.STUDENT)) {
       return res.status(403).json({ 
         message: 'Access denied: This account is not a student account' 
-      });
-    }
-
-    if (!user.isVerified) {
-      return res.status(403).json({
-        message: 'Please verify your email before logging in. Check your inbox for the verification link.'
       });
     }
 
@@ -431,7 +426,7 @@ const verifyEmail = async (req, res) => {
   user.verificationTokenExpires = null;
   await user.save({ validateBeforeSave: false });
 
-  res.json({ success: true, message: 'Email verified successfully. You can now sign in.' });
+  res.json({ success: true, message: 'Email verified successfully.' });
 };
 
 // Forgot password - request reset link
@@ -518,9 +513,9 @@ module.exports = {
   changePassword,
   uploadAvatar,
   getUserById,
-  verifyEmail,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  verifyEmail
 };
 
 // Update current user's profile
