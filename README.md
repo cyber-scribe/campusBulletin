@@ -1,4 +1,4 @@
-# Campus Bulletin Board Web App
+# Campus Bulletin Board Web Platform
 
 A comprehensive notice board application for educational institutions with role-based access control (Admin, Staff, and Students).
 
